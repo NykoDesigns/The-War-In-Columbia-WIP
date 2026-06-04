@@ -1,0 +1,3 @@
+﻿0x3FFF immediates in .text: 173
+
+Candidate GNames chunk-table globals (data ptrs near shift14+and0x3FFF):

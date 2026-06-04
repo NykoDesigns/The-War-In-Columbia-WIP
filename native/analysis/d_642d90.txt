@@ -1,0 +1,45 @@
+﻿  0x00642D90 (rva 0x242D90): sub esp, 0x30
+  0x00642D93 (rva 0x242D93): push ebx
+  0x00642D94 (rva 0x242D94): push ebp
+  0x00642D95 (rva 0x242D95): push esi
+  0x00642D96 (rva 0x242D96): mov esi, dword ptr [esp + 0x40]
+  0x00642D9A (rva 0x242D9A): mov eax, dword ptr [esi + 0x18]
+  0x00642D9D (rva 0x242D9D): push edi
+  0x00642D9E (rva 0x242D9E): xor edi, edi
+  0x00642DA0 (rva 0x242DA0): mov dword ptr [esp + 0x10], edi
+  0x00642DA4 (rva 0x242DA4): movzx edx, byte ptr [eax]
+  0x00642DA7 (rva 0x242DA7): inc eax
+  0x00642DA8 (rva 0x242DA8): mov dword ptr [esi + 0x18], eax
+  0x00642DAB (rva 0x242DAB): mov edx, dword ptr [edx*4 + 0x136dcb0]
+  0x00642DB2 (rva 0x242DB2): lea eax, [esp + 0x10]
+  0x00642DB6 (rva 0x242DB6): push eax
+  0x00642DB7 (rva 0x242DB7): mov ebx, ecx
+  0x00642DB9 (rva 0x242DB9): mov ecx, dword ptr [esi + 0x14]
+  0x00642DBC (rva 0x242DBC): push esi
+  0x00642DBD (rva 0x242DBD): call edx
+  0x00642DBF (rva 0x242DBF): mov ebp, 0xfffffffd
+  0x00642DC4 (rva 0x242DC4): and dword ptr [0x1371cfc], ebp
+  0x00642DCA (rva 0x242DCA): mov eax, dword ptr [esi + 0x18]
+  0x00642DCD (rva 0x242DCD): mov ecx, dword ptr [esi + 0x14]
+  0x00642DD0 (rva 0x242DD0): mov dword ptr [esp + 0x18], edi
+  0x00642DD4 (rva 0x242DD4): movzx edx, byte ptr [eax]
+  0x00642DD7 (rva 0x242DD7): inc eax
+  0x00642DD8 (rva 0x242DD8): mov dword ptr [esi + 0x18], eax
+  0x00642DDB (rva 0x242DDB): mov edx, dword ptr [edx*4 + 0x136dcb0]
+  0x00642DE2 (rva 0x242DE2): lea eax, [esp + 0x18]
+  0x00642DE6 (rva 0x242DE6): push eax
+  0x00642DE7 (rva 0x242DE7): push esi
+  0x00642DE8 (rva 0x242DE8): call edx
+  0x00642DEA (rva 0x242DEA): and dword ptr [0x1371cfc], ebp
+  0x00642DF0 (rva 0x242DF0): mov eax, dword ptr [esi + 0x18]
+  0x00642DF3 (rva 0x242DF3): mov ecx, dword ptr [esi + 0x14]
+  0x00642DF6 (rva 0x242DF6): mov dword ptr [esp + 0x20], edi
+  0x00642DFA (rva 0x242DFA): mov dword ptr [esp + 0x24], edi
+  0x00642DFE (rva 0x242DFE): movzx edx, byte ptr [eax]
+  0x00642E01 (rva 0x242E01): inc eax
+  0x00642E02 (rva 0x242E02): mov dword ptr [esi + 0x18], eax
+  0x00642E05 (rva 0x242E05): mov edx, dword ptr [edx*4 + 0x136dcb0]
+  0x00642E0C (rva 0x242E0C): lea eax, [esp + 0x20]
+  0x00642E10 (rva 0x242E10): push eax
+  0x00642E11 (rva 0x242E11): push esi
+  0x00642E12 (rva 0x242E12): call edx

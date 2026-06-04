@@ -1,0 +1,53 @@
+# Build artifacts
+native/build/
+native/install/
+*.dll
+*.exe
+*.lib
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exp
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.so
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Logs
+*.log
+
+# Backups
+backups/
+
+# Diversion
+.diversion/
+.dvignore

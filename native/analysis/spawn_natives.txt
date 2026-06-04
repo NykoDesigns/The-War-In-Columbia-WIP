@@ -1,0 +1,16 @@
+  entry@0x0133878C  func=0x009031E0  rva=0x5031E0  AXAIGammaSpawnerexecOnPawnStatusChange
+  entry@0x01338794  func=0x009031A0  rva=0x5031A0  AXAIGammaSpawnerexecOnAISpawned
+  entry@0x013388C4  func=0x00903640  rva=0x503640  UXAISpawningManagerexecAddAIDiedDelegate
+  entry@0x013388CC  func=0x00903600  rva=0x503600  UXAISpawningManagerexecHandleAIStatusChanged
+  entry@0x01338AFC  func=0x00904660  rva=0x504660  UXDLCBSeqAct_SpawnPneumoTurretsexecOnTurretKilled
+  entry@0x01338DA4  func=0x0090F760  rva=0x50F760  AXGameInfoexecInitSpawningManager
+  entry@0x0133A22C  func=0x008FA670  rva=0x4FA670  AXPawnexecOnDespawnAI
+  entry@0x0133AD4C  func=0x008FCC70  rva=0x4FCC70  AXPlayerControllerexecXUseNonWeaponObjectThatIsNotUnsubstantiated
+  entry@0x0133AD54  func=0x008FCC30  rva=0x4FCC30  AXPlayerControllerexecXUseObjectThatIsNotUnsubstantiated
+  entry@0x0133AD5C  func=0x008FCBF0  rva=0x4FCBF0  AXPlayerControllerexecXPerformSubstantiateObject
+  entry@0x0133B1FC  func=0x00900FB0  rva=0x500FB0  AXReactiveActorexecSubstantiatePushOutDynamicActors_EnableActorCollision
+  entry@0x0133B234  func=0x008F8580  rva=0x4F8580  AXReactiveActorexecStartUnsubstantiatedState
+  entry@0x0133B23C  func=0x008F8540  rva=0x4F8540  AXReactiveActorexecStartTransitionToUnsubstantiatedState
+  entry@0x0133B24C  func=0x008F84C0  rva=0x4F84C0  AXReactiveActorexecStartSubstantiatedState
+  entry@0x0133B51C  func=0x009039B0  rva=0x5039B0  AXSubstantiatableAISpawnerexecOnAISpawned
+  entry@0x0133B73C  func=0x0090BE60  rva=0x50BE60  UXSeqAct_SpawnAIexecOnAISpawned

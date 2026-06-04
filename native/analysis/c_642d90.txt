@@ -1,0 +1,2 @@
+﻿call targets from 0x00642D90:
+  at 0x00642F6C -> 0x0062CA80 (rva 0x22CA80)

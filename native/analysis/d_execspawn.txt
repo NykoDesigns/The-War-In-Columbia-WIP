@@ -1,0 +1,50 @@
+﻿  0x006340C0 (rva 0x2340C0): mov eax, dword ptr [esp + 4]
+  0x006340C4 (rva 0x2340C4): inc dword ptr [eax + 0x18]
+  0x006340C7 (rva 0x2340C7): push esi
+  0x006340C8 (rva 0x2340C8): mov esi, ecx
+  0x006340CA (rva 0x2340CA): mov ecx, dword ptr [eax + 0x18]
+  0x006340CD (rva 0x2340CD): cmp byte ptr [ecx], 0x41
+  0x006340D0 (rva 0x2340D0): jne 0x6340e2
+  0x006340D2 (rva 0x2340D2): inc ecx
+  0x006340D3 (rva 0x2340D3): push 0
+  0x006340D5 (rva 0x2340D5): mov dword ptr [eax + 0x18], ecx
+  0x006340D8 (rva 0x2340D8): mov ecx, dword ptr [eax + 0x14]
+  0x006340DB (rva 0x2340DB): push eax
+  0x006340DC (rva 0x2340DC): call dword ptr [0x136ddb4]
+  0x006340E2 (rva 0x2340E2): mov ecx, dword ptr [0x13ac3ec]
+  0x006340E8 (rva 0x2340E8): push 0
+  0x006340EA (rva 0x2340EA): push 1
+  0x006340EC (rva 0x2340EC): push 0
+  0x006340EE (rva 0x2340EE): push esi
+  0x006340EF (rva 0x2340EF): call 0x61c690
+  0x006340F4 (rva 0x2340F4): mov ecx, dword ptr [esp + 0xc]
+  0x006340F8 (rva 0x2340F8): mov dword ptr [ecx], eax
+  0x006340FA (rva 0x2340FA): pop esi
+  0x006340FB (rva 0x2340FB): ret 8
+  0x006340FE (rva 0x2340FE): int3 
+  0x006340FF (rva 0x2340FF): int3 
+  0x00634100 (rva 0x234100): push ecx
+  0x00634101 (rva 0x234101): push esi
+  0x00634102 (rva 0x234102): mov esi, dword ptr [esp + 0xc]
+  0x00634106 (rva 0x234106): mov eax, dword ptr [esi + 0x18]
+  0x00634109 (rva 0x234109): mov dword ptr [esp + 4], 0
+  0x00634111 (rva 0x234111): movzx edx, byte ptr [eax]
+  0x00634114 (rva 0x234114): inc eax
+  0x00634115 (rva 0x234115): push edi
+  0x00634116 (rva 0x234116): mov dword ptr [esi + 0x18], eax
+  0x00634119 (rva 0x234119): mov edx, dword ptr [edx*4 + 0x136dcb0]
+  0x00634120 (rva 0x234120): lea eax, [esp + 8]
+  0x00634124 (rva 0x234124): push eax
+  0x00634125 (rva 0x234125): mov edi, ecx
+  0x00634127 (rva 0x234127): mov ecx, dword ptr [esi + 0x14]
+  0x0063412A (rva 0x23412A): push esi
+  0x0063412B (rva 0x23412B): call edx
+  0x0063412D (rva 0x23412D): inc dword ptr [esi + 0x18]
+  0x00634130 (rva 0x234130): mov eax, dword ptr [esi + 0x18]
+  0x00634133 (rva 0x234133): cmp byte ptr [eax], 0x41
+  0x00634136 (rva 0x234136): jne 0x634148
+  0x00634138 (rva 0x234138): mov ecx, dword ptr [esi + 0x14]
+  0x0063413B (rva 0x23413B): push 0
+  0x0063413D (rva 0x23413D): inc eax
+  0x0063413E (rva 0x23413E): push esi
+  0x0063413F (rva 0x23413F): mov dword ptr [esi + 0x18], eax
