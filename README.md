@@ -1,5 +1,7 @@
 # The War In Columbia — BioShock Infinite Overhaul Mod
 
+![The War In Columbia](TheWarInColumbia2.png)
+
 A comprehensive mod manager for **BioShock Infinite** that overhauls combat encounters, weapon damage, and enemy health — all configurable through a GUI with no manual file editing required.
 
 ---
