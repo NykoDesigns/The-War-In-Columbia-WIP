@@ -1739,6 +1739,26 @@ void InitSpawnHook()
              pSerDisp, (unsigned)RVA_SerDispatch,
              hd[0], hd[1], hd[2], hd[3], hd[4]);
     }
+
+    // ── memcpy backstop guard (IAT thunk at 0xD455C -> MSVCR90 memcpy) ──
+    // This is the LAST-LINE backstop: both serialize hooks are live but never
+    // block the ~1GB corrupt copy, meaning the crash-stack frames are stale.
+    // Hooking memcpy gives us the TRUE caller via _ReturnAddress() and lets
+    // us clamp count to the source's committed extent to prevent the crash.
+    uintptr_t* pIATmemcpy = reinterpret_cast<uintptr_t*>(g_Base + RVA_memcpyIAT);
+    fn_memcpy* ppMemcpy = reinterpret_cast<fn_memcpy*>(pIATmemcpy);
+    Real_memcpy = *ppMemcpy;
+    if (MH_CreateHook(ppMemcpy, (void*)&Hook_memcpy,
+                      (void**)&Real_memcpy) != MH_OK) {
+        SLog("ERROR: MH_CreateHook(memcpy IAT) failed");
+    } else if (MH_EnableHook(ppMemcpy) != MH_OK) {
+        SLog("ERROR: MH_EnableHook(memcpy IAT) failed");
+    } else {
+        SLog("MEMCPY-GUARD ENABLED @ IAT 0x%p (base + 0x%X). Guarding copies "
+             ">= %u MB with VirtualQuery clamping. Original memcpy = 0x%p.",
+             ppMemcpy, (unsigned)RVA_memcpyIAT, MEMCPY_HUGE / (1024 * 1024),
+             (void*)Real_memcpy);
+    }
 }
 
 void ShutdownSpawnHook()
