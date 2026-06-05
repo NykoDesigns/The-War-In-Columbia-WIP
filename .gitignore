@@ -48,6 +48,11 @@ Thumbs.db
 # Backups
 backups/
 
+# Ghidra project data (large binary blobs)
+tools/ghidra/BioInfinite.rep/
+tools/ghidra/BioInfinite.gpr
+tools/ghidra/out_*.json
+
 # Diversion
 .diversion/
 .dvignore

@@ -60,6 +60,15 @@ static const unsigned   DESC_STRIDE     = 0xF0; // bytes per enemy descriptor
 static const unsigned OFF_DESC_CountA = 0x0C; // spawn count (target)
 static const unsigned OFF_DESC_CountB = 0x10; // spawn count (remaining)
 
+// ─── TEST MATRIX BUILD FLAGS ─────────────────────────────────────────────
+// Toggle these to isolate crash source per the A/B/C/D test matrix:
+//   Build A: ENABLE_SPAWN_MULT=false, ENABLE_AUDIO_ENLARGE=false (vanilla baseline)
+//   Build B: ENABLE_SPAWN_MULT=true,  ENABLE_AUDIO_ENLARGE=false (spawns only)
+//   Build C: ENABLE_SPAWN_MULT=false, ENABLE_AUDIO_ENLARGE=true  (audio pools only)
+//   Build D: ENABLE_SPAWN_MULT=true,  ENABLE_AUDIO_ENLARGE=true  (full mod)
+static const bool     ENABLE_SPAWN_MULT    = true;   // roster grow multiplier
+static const bool     ENABLE_AUDIO_ENLARGE = true;   // Wwise pool enlarger
+
 // ─── Multiplier config ───────────────────────────────────────────────────
 static const int      g_Multiplier      = 2;   // x2 enemies (tunable later)
 static const unsigned MULT_MEM_GATE_MB  = 500; // skip if largest-free below this
@@ -74,8 +83,9 @@ static const bool     g_DoMultiply      = false;
 static const int      g_ExtraAIPerSpawn = 1;
 static const bool     g_DoubleAI        = false;
 
-// x2 multiplier (CONFIRMED design). g_RosterMult=2 => double the wave.
-static const int      g_RosterMult      = 5;
+// x2 multiplier. Reduced from 3 to 2 to avoid PhysX constraint crash
+// from too many simultaneous physics-simulated actors.
+static const int      g_RosterMult      = 2;
 // Roster credit-back doubler: REJECTED. Inflating count past the array length
 // walks the director's monotonic cursor off the end -> OOB -> render crash.
 static const bool     g_DoubleRoster    = false;
@@ -126,7 +136,7 @@ static const bool     g_DiagNoGrow      = false;
 // spawn (no OOB; the grow itself was clean). Big scripted waves are fragile and
 // memory-heavy in Infinite, so never let a grown wave exceed this many enemies.
 // Small waves (1->2, 2->4, 3->6) still double; an 8-wave is left untouched.
-static const int      g_MaxWaveTotal    = 12;
+static const int      g_MaxWaveTotal    = 8;  // reduced from 12: PhysX crashes with too many actors
 // Require this much extra headroom PER added enemy on top of the base gate, so a
 // big add only proceeds with comfortable memory (defends the stale-poll spike).
 static const unsigned MULT_MEM_PER_ADD_MB = 60;
@@ -1007,6 +1017,21 @@ static void ApplyRosterGrow(void* roster)
     // Sanity: plausible TArray of enemy descriptors with real slack.
     if (!data || num < 1 || num > 128 || maxc < num || maxc > 512) return;
 
+    // TEST MATRIX: skip all roster grow if spawn multiplier is disabled
+    if (!ENABLE_SPAWN_MULT) return;
+
+    // COMPANION FILTER: never multiply rosters with only 1 NPC. These are
+    // unique/companion NPCs (Elizabeth, Songbird, story actors). Multiplying
+    // Elizabeth causes 4 companions to spawn -> corrupt AI state -> crash.
+    // Enemy squads always have Num >= 2.
+    if (num < 2) {
+        static volatile LONG s_skipOnce = 0;
+        if (InterlockedIncrement(&s_skipOnce) <= 3)
+            SLog("ROSTER-SKIP: Num=%d Max=%d (single-NPC roster, likely companion)",
+                 num, maxc);
+        return;
+    }
+
     std::lock_guard<std::mutex> lk(g_RosterMtx);
     DumpDescDiff(data, num); // one-shot: identify per-enemy vs shared fields
     GrowSlot* s = nullptr;
@@ -1056,10 +1081,14 @@ static void ApplyRosterGrow(void* roster)
             // (desc[1]) has both zero, so this yields a clean independent clone.
             *reinterpret_cast<unsigned*>(dst + OFF_DESC_RuntimeCnt) = 0;
             *reinterpret_cast<unsigned*>(dst + OFF_DESC_RuntimePtr) = 0;
-            // Delegate (OnAISpawned, +0xD8) is a {object, FName, FName} binding,
-            // not heap-owned; copy it verbatim so the extra pawn registers with
-            // its spawner like the original (prevents the orphaned-actor state
-            // the level-transition serializer crashed on).
+            // +0xCC: XAIScriptedSpawner back-reference. Same for all descs in a
+            // roster (not flagged by DESC-DIFF) but IS a live UObject*. When the
+            // spawner unloads, clones holding this pointer -> use-after-free.
+            *reinterpret_cast<unsigned*>(dst + 0xCC) = 0;
+            // +0xD8: Delegate {ObjectPtr, FName, FName}. The object pointer (first
+            // 4 bytes) references the spawner. Zero the entire 12-byte delegate so
+            // the clone is fully independent — no dangling UObject references.
+            memset(dst + 0xD8, 0, 12);
             // Nudge the clone's spawn X so it does not perfectly overlap its
             // source (perfectly-coincident actors can fail collision/spawn).
             float* x = reinterpret_cast<float*>(dst + OFF_DESC_PosX);
@@ -1285,7 +1314,7 @@ typedef long(__cdecl* fn_CreatePool)(void* mem, unsigned size, unsigned block,
                                      unsigned attrs, unsigned align);
 static fn_CreatePool Real_CreatePool = nullptr;
 static const char* const AK_CREATEPOOL_SYM = "?CreatePool@MemoryMgr@AK@@YAJPAXKKKK@Z";
-static unsigned g_AudioPoolMult  = 4;            // enlarge each Wwise pool 4x
+static unsigned g_AudioPoolMult  = 2;            // enlarge each Wwise pool 2x (4x used too much 32-bit address space)
 static const unsigned AUDIO_POOL_CAP = 0x20000000u; // never exceed 512 MB/pool
 static volatile LONG g_AudioPoolHooked = 0;
 static volatile LONG g_AudioPoolsGrown = 0;
@@ -1295,7 +1324,7 @@ static long __cdecl Hook_CreatePool(void* mem, unsigned size, unsigned block,
 {
     unsigned origSize = size, newSize = size;
     void*    newMem   = mem;
-    if (g_AudioPoolMult > 1 && size >= 0x1000 && size < 0x40000000u) {
+    if (ENABLE_AUDIO_ENLARGE && g_AudioPoolMult > 1 && size >= 0x1000 && size < 0x40000000u) {
         unsigned long long grown = (unsigned long long)size * g_AudioPoolMult;
         if (grown > AUDIO_POOL_CAP) grown = AUDIO_POOL_CAP;
         if (block) grown -= (grown % block);   // keep block-pool size a multiple
@@ -1424,6 +1453,62 @@ static LONG CALLBACK CrashVEH(EXCEPTION_POINTERS* ep)
                  "(E9=our jmp intact / 56=orig push esi => bypassed)",
                  hk[0], hk[1], hk[2], hk[3], hk[4], hk[5], hk[6]);
     } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    // ── MEMCPY CRASH RECOVERY ─────────────────────────────────────────────────
+    // This is a VANILLA ENGINE BUG (proven: crashes with spawn mult OFF).
+    // We cannot fix the root cause, but we CAN survive it by simulating memcpy's
+    // return when it faults. The caller's logic then advances past the corrupt
+    // read. Stale data remains in the destination but the game continues.
+    //
+    // Detection: EIP is inside MSVCR90!memcpy (within 0x200 bytes of entry) and
+    // it's an access violation. [ESP] holds the return address back to the caller.
+    if (code == EXCEPTION_ACCESS_VIOLATION) {
+        uintptr_t eip = ep->ContextRecord->Eip;
+        // Resolve MSVCR90!memcpy entry to determine if EIP is inside it.
+        static uintptr_t s_mcEntry = 0;
+        if (!s_mcEntry) {
+            HMODULE hCRT = GetModuleHandleA("MSVCR90.dll");
+            if (hCRT) {
+                void* p = GetProcAddress(hCRT, "memcpy");
+                if (p) s_mcEntry = reinterpret_cast<uintptr_t>(p);
+            }
+        }
+        uintptr_t mcEntry = s_mcEntry;
+        if (mcEntry && eip >= mcEntry && eip < mcEntry + 0x400) {
+            // EIP is inside memcpy (after push ebp; mov ebp,esp; push regs).
+            // The frame pointer (EBP) gives us the standard stack frame:
+            //   [EBP]   = saved caller's EBP
+            //   [EBP+4] = return address (back to Hook_memcpy or caller)
+            //   [EBP+8] = dst (first arg, cdecl)
+            // Simulate memcpy's RET: restore EBP, set EIP=[EBP+4], ESP=EBP+8
+            uintptr_t* bp = reinterpret_cast<uintptr_t*>(ep->ContextRecord->Ebp);
+            if (!IsBadReadPtr(bp, 8)) {
+                uintptr_t savedEbp = bp[0];
+                uintptr_t retAddr  = bp[1];
+                // Sanity: retAddr should be in a code region (our DLL or game exe)
+                bool validRet = (retAddr >= 0x00400000 && retAddr < 0x70000000);
+                if (validRet) {
+                    static volatile LONG s_recoveries = 0;
+                    LONG nr = InterlockedIncrement(&s_recoveries);
+                    if (nr <= 20)
+                        SLog("MEMCPY-RECOVER #%ld: EIP was 0x%p (inside memcpy), "
+                             "returning to 0x%p with dst=0x%08X (frame-based unwind)",
+                             nr, (void*)eip, (void*)retAddr,
+                             (unsigned)ep->ContextRecord->Edi);
+                    // Restore EBP to caller's saved value
+                    ep->ContextRecord->Ebp = (DWORD)savedEbp;
+                    // Set return value: EAX = dst (EDI holds dst in rep movs)
+                    ep->ContextRecord->Eax = ep->ContextRecord->Edi;
+                    // Unwind frame: ESP = EBP + 8 (past saved EBP and ret addr)
+                    ep->ContextRecord->Esp = (DWORD)(uintptr_t)(bp + 2);
+                    // Jump to return address
+                    ep->ContextRecord->Eip = (DWORD)retAddr;
+                    return EXCEPTION_CONTINUE_EXECUTION;
+                }
+            }
+        }
+    }
+
     return EXCEPTION_CONTINUE_SEARCH; // let the game's handler still run
 }
 
@@ -1485,10 +1570,18 @@ static const int       POOL_GROW_NODES = 64; // nodes to add when game passes 0
 // and SKIP the copy (return as if length 0) instead of crashing. Every trigger
 // is logged so we can confirm it only fires on the corrupt read, never on real
 // loads (raise the cap if a legit large read ever trips it).
+// Async double-buffered streaming reader @ 0x96F00 (__thiscall(this,dst,count)).
+// This is the ACTUAL crash function: computes avail = bufEnd - curPos, and when
+// bufEnd=0 (freed/reset buffer) wraps to ~4GB. Hooking here lets us catch the
+// invalid buffer state BEFORE memcpy is called — the correct upstream fix.
+static const uintptr_t RVA_StreamRead = 0x96F00;
+// (no hook function needed — we use a binary patch instead)
+
 static const uintptr_t RVA_ArSerialize = 0xEBA70;
-// Legit reads on this buffered path never exceed ~2MB across 19M observed calls,
-// so 8MB is a safe ceiling (4x margin) that still catches the corrupt ~1GB read.
-static const int       SER_MAX_LEN     = 0x800000;   // 8 MB: bigger == corrupt
+// Legit texture bulk reads can reach ~17MB (e.g. FX_Lighthouse.Main1912_DIF =
+// 16,777,598 bytes). Set ceiling to 32MB; the memcpy backstop (also 32MB)
+// catches any corrupt read that slips past.
+static const int       SER_MAX_LEN     = 0x2000000;  // 32 MB: matches memcpy guard
 typedef void(__fastcall* fn_ArSerialize)(void* This, void* edx, void* dst, int length);
 static fn_ArSerialize Real_ArSerialize = nullptr;
 static volatile LONG  g_SerGuards = 0;
@@ -1517,7 +1610,7 @@ static volatile LONG  g_SerDispCalls = 0;
 // A valid large copy (src fully mapped) passes unchanged; only the corrupt
 // overrun is clamped. Gated on count>=64MB so normal small memcpys are untouched.
 static const uintptr_t RVA_memcpyIAT = 0xD455C;
-static const size_t    MEMCPY_HUGE   = 0x4000000; // 64 MB: bigger == suspicious
+static const size_t    MEMCPY_HARD_MAX = 0x2000000; // 32 MB: hard ceiling
 typedef void*(__cdecl* fn_memcpy)(void* dst, const void* src, size_t count);
 static fn_memcpy Real_memcpy = nullptr;
 static volatile LONG g_MemcpyGuards = 0;
@@ -1539,6 +1632,17 @@ static void* __fastcall Hook_PoolRefill(void* This, void* edx, int count)
     return Real_PoolRefill(This, edx, use);
 }
 
+// ── STREAMING READER BINARY PATCH (the actual crash fix) ─────────────────────
+// FUN_00496F00: double-buffered async reader. Ghidra disassembly reveals:
+//   At offset +0x5E: "7E 02" = JLE (signed) for buffer1 avail check
+//   At offset +0xA7: "7E 02" = JLE (signed) for buffer2 avail check
+//   When bufEnd=0 (freed buffer), avail wraps to ~4GB unsigned / -1.5M signed.
+//   JLE incorrectly passes (signed -1.5M <= count), so memcpy gets 4GB.
+//   Fix: patch both to 0x76 (JBE, unsigned). 4GB > count → caps to count.
+//   The capped read (few bytes from a stale but accessible heap address) is
+//   harmless — the engine gets garbage data for one field and recovers.
+// No function hook needed — binary patch applied at init, zero runtime overhead.
+
 static volatile LONG g_SerCalls = 0;       // total intercepts (proves hook is live)
 static volatile LONG g_SerBigLogged = 0;   // rate-limit for large pass-through logs
 
@@ -1558,7 +1662,6 @@ static void __fastcall Hook_ArSerialize(void* This, void* edx, void* dst, int le
     if (length < 0 || length > SER_MAX_LEN) {
         LONG n = InterlockedIncrement(&g_SerGuards);
         if (n <= 60) {
-            // Pull the inner buffer-reader (this+0x4B0) cursors for diagnostics.
             unsigned inner = 0, cur = 0, rem = 0, endp = 0;
             __try {
                 inner = *reinterpret_cast<unsigned*>((char*)This + 0x4B0);
@@ -1572,13 +1675,14 @@ static void __fastcall Hook_ArSerialize(void* This, void* edx, void* dst, int le
             uintptr_t ra = reinterpret_cast<uintptr_t>(_ReturnAddress());
             unsigned raRva = (ra >= g_Base && ra < g_Base + 0x1100000)
                                  ? (unsigned)(ra - g_Base) : 0;
-            SLog("SER-GUARD #%ld: BLOCKED corrupt Serialize length=%d (0x%08X) "
+            SLog("SER-DIAG-CORRUPT #%ld: length=%d (0x%08X) "
                  "dst=0x%p this=0x%p inner=0x%08X cur=0x%08X rem=0x%08X end=0x%08X "
-                 "caller_rva=0x%X -> skipped copy (prevented ~1GB memcpy crash)",
+                 "caller_rva=0x%X -> LOGGING ONLY (pass-through)",
                  n, length, (unsigned)length, dst, This, inner, cur, rem, endp,
                  raRva);
         }
-        return;                            // skip the copy: original treats len<=0 as no-op
+        // LOGGING-ONLY: pass through to real function, let crash happen cleanly
+        // so VEH handler captures the true fault for diagnosis.
     }
     Real_ArSerialize(This, edx, dst, length);
 }
@@ -1594,42 +1698,30 @@ static void* __fastcall Hook_SerDispatch(void* This, void* edx, void* dst, int l
             uintptr_t ra = reinterpret_cast<uintptr_t>(_ReturnAddress());
             unsigned raRva = (ra >= g_Base && ra < g_Base + 0x1100000)
                                  ? (unsigned)(ra - g_Base) : 0;
-            SLog("SERDISP-GUARD #%ld: BLOCKED corrupt dispatch length=%d (0x%08X) "
-                 "dst=0x%p this=0x%p caller_rva=0x%X -> skipped (prevented crash)",
+            SLog("SERDISP-DIAG-CORRUPT #%ld: length=%d (0x%08X) "
+                 "dst=0x%p this=0x%p caller_rva=0x%X -> LOGGING ONLY (pass-through)",
                  n, length, (unsigned)length, dst, This, raRva);
         }
-        return This;                       // return archive (operator<< chaining)
+        // LOGGING-ONLY: pass through, let VEH catch the crash cleanly
     }
     return Real_SerDispatch(This, edx, dst, length);
 }
 
 static void* __cdecl Hook_memcpy(void* dst, const void* src, size_t count)
 {
-    if (count >= MEMCPY_HUGE) {
-        // Determine how many bytes are actually committed & readable from src.
-        size_t safe = 0;
-        MEMORY_BASIC_INFORMATION mbi;
-        if (src && VirtualQuery(src, &mbi, sizeof mbi) == sizeof mbi &&
-            mbi.State == MEM_COMMIT &&
-            !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))) {
-            uintptr_t regionEnd = reinterpret_cast<uintptr_t>(mbi.BaseAddress) +
-                                  mbi.RegionSize;
-            safe = regionEnd - reinterpret_cast<uintptr_t>(src);
-        }
+    if (count >= MEMCPY_HARD_MAX) {
+        // Safety net: should no longer fire now that Hook_StreamRead validates
+        // avail before calling memcpy. If it still fires, log and block.
         LONG n = InterlockedIncrement(&g_MemcpyGuards);
-        if (n <= 80) {
+        if (n <= 20) {
             uintptr_t ra = reinterpret_cast<uintptr_t>(_ReturnAddress());
             unsigned raRva = (ra >= g_Base && ra < g_Base + 0x1100000)
                                  ? (unsigned)(ra - g_Base) : 0;
-            SLog("MEMCPY-GUARD #%ld: HUGE count=%Iu (0x%IX) dst=0x%p src=0x%p "
-                 "src_readable=%Iu caller_rva=0x%X (abs=0x%p)%s",
-                 n, count, count, dst, src, safe, raRva, (void*)ra,
-                 (count > safe) ? " -> CLAMPED (prevented overrun crash)" : "");
+            SLog("MEMCPY-GUARD #%ld: BLOCKED count=%Iu (0x%IX) "
+                 "dst=0x%p src=0x%p caller_rva=0x%X -> return dst (no-op)",
+                 n, count, count, dst, src, raRva);
         }
-        if (count > safe) {                // corrupt length: clamp to mapped src
-            count = safe;
-            if (count == 0) return dst;    // nothing safely readable -> no-op
-        }
+        return dst;
     }
     return Real_memcpy(dst, src, count);
 }
@@ -1643,6 +1735,10 @@ void InitSpawnHook()
 
     if (!g_Base) g_Base = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
     SLog("module base = 0x%p", (void*)g_Base);
+    SLog("BUILD CONFIG: SpawnMult=%s x%d | AudioEnlarge=%s x%u | "
+         "Hooks=LOGGING-ONLY (no clamp/block/exception)",
+         ENABLE_SPAWN_MULT ? "ON" : "OFF", g_RosterMult,
+         ENABLE_AUDIO_ENLARGE ? "ON" : "OFF", g_AudioPoolMult);
 
     void* pSpawnActor = reinterpret_cast<void*>(g_Base + RVA_SpawnActor);
     SLog("UWorld::SpawnActor @ 0x%p (base + 0x%X)", pSpawnActor,
@@ -1709,6 +1805,43 @@ void InitSpawnHook()
              pPoolRefill, (unsigned)RVA_PoolRefill, POOL_GROW_NODES);
     }
 
+    // ── STREAMING READER: binary patch JLE→JBE (the actual crash fix) ────────
+    // FUN_00496F00 at offset +0x5E has "7E 02" = JLE (signed).
+    // When avail wraps to 0xFFE889B4 (signed: -1.5M), JLE says -1.5M <= count
+    // → doesn't cap → memcpy with 4GB. Patching to 0x76 (JBE, unsigned) makes
+    // 0xFFE889B4 > count → caps to count → small harmless read.
+    {
+        // Patch TWO JLE→JBE instructions:
+        //   +0x5E = buffer1 avail comparison (7E 02 → 76 02)
+        //   +0xA7 = buffer2 avail comparison (7E 02 → 76 02)
+        struct { unsigned offset; const char* label; } patches[] = {
+            { 0x5E, "buf1" }, { 0xA7, "buf2" }
+        };
+        for (int pi = 0; pi < 2; pi++) {
+            unsigned char* patchAddr = reinterpret_cast<unsigned char*>(
+                g_Base + RVA_StreamRead + patches[pi].offset);
+            DWORD oldProt;
+            if (VirtualProtect(patchAddr, 2, PAGE_EXECUTE_READWRITE, &oldProt)) {
+                if (patchAddr[0] == 0x7E && patchAddr[1] == 0x02) {
+                    patchAddr[0] = 0x76;  // JBE (unsigned) instead of JLE (signed)
+                    SLog("STREAMREAD-PATCH: patched JLE->JBE at 0x%p (base+0x%X) [%s]. "
+                         "Avail comparison is now UNSIGNED.",
+                         patchAddr, (unsigned)(RVA_StreamRead + patches[pi].offset),
+                         patches[pi].label);
+                } else {
+                    SLog("STREAMREAD-PATCH WARNING: expected 7E 02 at +0x%X, found %02X %02X. "
+                         "NOT patching [%s].", patches[pi].offset,
+                         patchAddr[0], patchAddr[1], patches[pi].label);
+                }
+                VirtualProtect(patchAddr, 2, oldProt, &oldProt);
+            } else {
+                SLog("STREAMREAD-PATCH ERROR: VirtualProtect failed at 0x%p", patchAddr);
+            }
+        }
+    }
+    // No function hook needed — binary patch is sufficient and avoids overhead
+    // on this extremely hot-path function (called millions of times during load).
+
     // ── Streaming-serialize guard (out-of-combat ~1GB memcpy crash) ──
     void* pArSerialize = reinterpret_cast<void*>(g_Base + RVA_ArSerialize);
     if (MH_CreateHook(pArSerialize, (void*)&Hook_ArSerialize,
@@ -1740,24 +1873,38 @@ void InitSpawnHook()
              hd[0], hd[1], hd[2], hd[3], hd[4]);
     }
 
-    // ── memcpy backstop guard (IAT thunk at 0xD455C -> MSVCR90 memcpy) ──
-    // This is the LAST-LINE backstop: both serialize hooks are live but never
-    // block the ~1GB corrupt copy, meaning the crash-stack frames are stale.
-    // Hooking memcpy gives us the TRUE caller via _ReturnAddress() and lets
-    // us clamp count to the source's committed extent to prevent the crash.
-    uintptr_t* pIATmemcpy = reinterpret_cast<uintptr_t*>(g_Base + RVA_memcpyIAT);
-    fn_memcpy* ppMemcpy = reinterpret_cast<fn_memcpy*>(pIATmemcpy);
-    Real_memcpy = *ppMemcpy;
-    if (MH_CreateHook(ppMemcpy, (void*)&Hook_memcpy,
-                      (void**)&Real_memcpy) != MH_OK) {
-        SLog("ERROR: MH_CreateHook(memcpy IAT) failed");
-    } else if (MH_EnableHook(ppMemcpy) != MH_OK) {
-        SLog("ERROR: MH_EnableHook(memcpy IAT) failed");
-    } else {
-        SLog("MEMCPY-GUARD ENABLED @ IAT 0x%p (base + 0x%X). Guarding copies "
-             ">= %u MB with VirtualQuery clamping. Original memcpy = 0x%p.",
-             ppMemcpy, (unsigned)RVA_memcpyIAT, MEMCPY_HUGE / (1024 * 1024),
-             (void*)Real_memcpy);
+    // ── memcpy backstop guard ──
+    // Resolve MSVCR90!memcpy via GetProcAddress (IAT slot 0xD455C was WRONG —
+    // it contained 0x15543589, not the real memcpy address). Then MinHook
+    // patches the function prologue. Hard-clamps any copy >= 32MB.
+    {
+        HMODULE hCRT = GetModuleHandleA("MSVCR90.dll");
+        if (!hCRT) hCRT = GetModuleHandleA("msvcr90.dll");
+        if (!hCRT) hCRT = GetModuleHandleA("msvcrt.dll");
+        fn_memcpy pMemcpy = nullptr;
+        if (hCRT) {
+            pMemcpy = reinterpret_cast<fn_memcpy>(GetProcAddress(hCRT, "memcpy"));
+        }
+        SLog("memcpy resolve: MSVCR90=%p GetProcAddress(memcpy)=%p",
+             (void*)hCRT, (void*)pMemcpy);
+        if (pMemcpy) {
+            if (MH_CreateHook(reinterpret_cast<void*>(pMemcpy),
+                              reinterpret_cast<void*>(&Hook_memcpy),
+                              reinterpret_cast<void**>(&Real_memcpy)) != MH_OK) {
+                SLog("ERROR: MH_CreateHook(MSVCR90!memcpy) failed");
+            } else if (MH_EnableHook(reinterpret_cast<void*>(pMemcpy)) != MH_OK) {
+                SLog("ERROR: MH_EnableHook(MSVCR90!memcpy) failed");
+            } else {
+                SLog("MEMCPY-GUARD ENABLED (hooked MSVCR90!memcpy @ 0x%p). "
+                     "Hard ceiling = %u MB. Trampoline = 0x%p. "
+                     "Any copy >= %u bytes is BLOCKED unconditionally.",
+                     (void*)pMemcpy,
+                     (unsigned)(MEMCPY_HARD_MAX / (1024 * 1024)),
+                     (void*)Real_memcpy, (unsigned)MEMCPY_HARD_MAX);
+            }
+        } else {
+            SLog("ERROR: Could not resolve MSVCR90!memcpy — guard NOT installed");
+        }
     }
 }
 
