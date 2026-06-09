@@ -502,16 +502,82 @@ Descriptor objects found in packages (serial data preview):
 
 ## 7. Known Runtime Offsets (from native hook)
 
-### Spawn Descriptor (DESC_STRIDE bytes, cloned at runtime)
+### AISpawnInfo Struct (DESC_STRIDE = 0xF0 = 240 bytes)
 
-| Offset | Field | Notes |
-|--------|-------|-------|
-| +0x00..+0x?? | TArray fields | Multiple embedded TArrays (inventory, etc) |
-| +0xCC | UObject* (Spawner) | Back-reference to XAIScriptedSpawner; zeroed in clones |
-| +0xD8 | Delegate{Obj,FName,FName} | 12 bytes; object pointer to spawner; zeroed |
-| +0xE8 | RuntimeCnt | Per-instance counter; zeroed in clones |
-| +0xEC | RuntimePtr | Per-instance heap pointer; zeroed in clones |
-| +OFF_DESC_PosX | float | Spawn X position; nudged +96 per clone |
+Complete field layout from runtime STRUCT dump of `AISpawnInfo` ScriptStruct:
+
+| Offset | Field | Type | Size | Clone Action |
+|--------|-------|------|------|--------------|
+| +0x00 | GammaPack | ObjectProperty | 4 | Copy (shared archetype) |
+| +0x04 | PawnArch | ObjectProperty | 4 | Copy (shared archetype) |
+| +0x08 | PawnLabels | ArrayProperty | 12 | **Deep-copy** (per-enemy TArray) |
+| +0x0C | CountA (target) | int | 4 | **Force to 1** (prevents count explosion) |
+| +0x10 | CountB (remaining) | int | 4 | **Force to 1** |
+| +0x14 | PawnAppearanceOverride | ObjectProperty | 4 | Copy |
+| +0x18 | VoiceTypeCollectionOverride | ObjectProperty | 4 | Copy |
+| +0x1C | SubtitledSpeakerOverride | ObjectProperty | 4 | Copy |
+| +0x20 | LootList | ArrayProperty | 12 | **Deep-copy** |
+| +0x2C | Bool bitfield | BoolProperty | 4 | Copy (bGiveDefaultLoot, bDead, etc.) |
+| +0x30 | LootToAwardOnKillList | ArrayProperty | 12 | **Deep-copy** |
+| +0x3C | InventoryList | ArrayProperty | 12 | **Deep-copy** |
+| +0x48 | DeadPoseAnimSequence | ObjectProperty | 4 | Copy |
+| +0x4C | DeadPoseTime | FloatProperty | 4 | Copy |
+| +0x50 | SirenPriority | FloatProperty | 4 | Copy |
+| +0x54 | MiniBuddyPriority | FloatProperty | 4 | Copy |
+| +0x58 | Faction | NameProperty | 8 | Copy |
+| +0x60 | SpawnLocation.X | Float (XFloatingPosition) | 4 | **Nudge +96×i** |
+| +0x64 | SpawnLocation.Y | Float | 4 | **Nudge ±64** |
+| +0x68 | SpawnLocation.Z | Float | 4 | Copy |
+| +0x6C | SpawnLocation.SectionIndex | Int | 4 | Copy |
+| +0x70 | SpawnRotation | XFloatingRotator | 16 | Copy |
+| +0x80 | SpawnFloatingSectionIndex | IntProperty | 4 | Copy |
+| +0x84 | AttachmentSetSeedOverride | IntProperty | 4 | Copy |
+| +0x88 | MeshOverride | ObjectProperty | 4 | Copy |
+| +0x8C | MaterialOverride | ObjectProperty | 4 | Copy |
+| +0x90 | ThirdPersonWeaponModelOverride | ObjectProperty | 4 | Copy |
+| +0x94 | AttachmentSetOverride | ObjectProperty | 4 | Copy |
+| +0x98 | CaptainPawn | ObjectProperty | 4 | Copy |
+| +0x9C | PatrolPath | ObjectProperty | 4 | Copy |
+| +0xA0 | SpatialRestrictions | ObjectProperty | 4 | Copy |
+| +0xA4 | AIRole | ObjectProperty | 4 | Copy |
+| +0xA8 | MinAILevel | IntProperty | 4 | Copy |
+| +0xAC | MaxAILevel | IntProperty | 4 | Copy |
+| +0xB0 | CullingPriority | IntProperty | 4 | Copy |
+| +0xB4 | OptionalIdleRoleBehaviorTree | ObjectProperty | 4 | Copy |
+| +0xB8 | SirenResurrectionAnimSet | ObjectProperty | 4 | Copy |
+| +0xBC | SmartTerrainScriptName | NameProperty | 8 | Copy |
+| +0xC4 | DistanceToMoveAwayFromSmartTerrain | FloatProperty | 4 | Copy |
+| +0xC8 | FrobEvent | ObjectProperty | 4 | Copy |
+| +0xCC | Spawner | ObjectProperty | 4 | **Keep** (needed for damage registration) |
+| +0xD0 | SpawnerLevelName | NameProperty | 8 | Copy |
+| +0xD8 | Delegate | DelegateProperty | 12 | **Keep** (needed for post-spawn callbacks) |
+| +0xE4 | ScenarioRestoreIndex | IntProperty | 4 | Copy |
+| +0xE8 | RuntimeCnt (not in script) | — | 4 | **Zero** (per-instance, prevents serializer crash) |
+| +0xEC | RuntimePtr (not in script) | — | 4 | **Zero** (per-instance heap ptr, use-after-free risk) |
+
+### DESC-DIFF Patterns (confirmed across multiple sessions)
+
+Fields that consistently DIFFER between desc[0] and desc[1] in the same roster:
+- **+0x08** (PawnLabels.Data) — always different → deep-copied
+- **+0x60** (SpawnLocation.X) — different positions per enemy → nudged
+- **+0xE8/+0xEC** (RuntimeCnt/RuntimePtr) — desc[0]=0x101/heap, desc[1]=0/0 → zeroed
+
+Fields that sometimes differ (mixed-type rosters):
+- **+0x04** (PawnArch) — different enemy types in same roster
+- **+0x0C/+0x10** (Counts) — e.g., 7/5 for different group sizes
+- **+0x14** (PawnAppearanceOverride)
+- **+0xCC** (Spawner) — differs between rosters, same within a roster
+
+### Root Cause Analysis
+
+**PhysX Crash**: Clones inherited CountA=7 from source descriptors. A 2-desc roster
+(7+5=12 enemies) growing to 4 descriptors produced 7+5+7+5=24 enemies. Multiple waves
+stacking → PhysX solver overwhelmed. **Fix**: Force clone CountA=1.
+
+**Invulnerable Clones**: Zeroing +0xCC (Spawner) and +0xD8 (Delegate) broke the
+spawner's post-spawn registration path. The spawner uses these references to register
+newly-spawned pawns with the damage system. **Fix**: Keep them intact (shared by all
+descriptors in a roster; same-level-package → no use-after-free).
 
 ### Stream Reader Object (FUN_00496F00 this-pointer)
 
@@ -533,13 +599,16 @@ Descriptor objects found in packages (serial data preview):
 | RVA | Symbol | Notes |
 |-----|--------|-------|
 | 0x22CA80 | SpawnActor | UWorld::SpawnActor |
-| 0x658870 | SpawnRoster | Roster-based AI spawner |
+| 0x651BE0 | CreateAI | Create XAIController + possess pooled pawn |
+| 0x657B40 | SpawnOneAI | Per-descriptor spawn (idempotent, no doubling) |
+| 0x658870 | SpawnRoster | Roster-based wave spawner (iterates TArray) |
 | 0x96F00 | StreamRead (FUN_00496F00) | Double-buffered async reader (PATCHED) |
 | 0x96F5E | StreamRead+0x5E | JLE→JBE patch site (buf1) |
 | 0x96FA7 | StreamRead+0xA7 | JLE→JBE patch site (buf2) |
 | 0x958C0 | PoolRefill | Object pool grow function |
 | 0xEBA70 | ArSerialize | FArchive::Serialize |
 | 0x80D00 | SerDispatch | Serialize dispatcher |
+| 0x82AB0 | appRealloc | Engine memory allocator |
 | 0x4D455C | memcpy IAT | Import Address Table slot |
 
 ---
@@ -548,10 +617,13 @@ Descriptor objects found in packages (serial data preview):
 
 | Setting | Value | Notes |
 |---------|-------|-------|
-| g_RosterMult | 2 | Enemy wave multiplier |
-| g_MaxWaveTotal | 8 | Max enemies per wave |
+| g_RosterMult | 3 | Descriptor multiplier (3x descriptors per wave) |
+| g_MaxWaveTotal | 16 | Max descriptor count per wave |
 | MULT_MEM_GATE_MB | 500 | Min free memory to allow grow |
 | MULT_MEM_PER_ADD_MB | 60 | Extra headroom per added enemy |
 | ENABLE_SPAWN_MULT | true | Master spawn switch |
 | ENABLE_AUDIO_ENLARGE | true | Wwise pool 2x enlarger |
-| DESC_STRIDE | (from code) | Bytes per spawn descriptor |
+| DESC_STRIDE | 0xF0 (240) | Bytes per AISpawnInfo descriptor |
+| Clone CountA/B | forced to 1 | Each clone = exactly 1 enemy |
+| Clone Spawner/Delegate | kept intact | Needed for damage registration |
+| Clone RuntimeCnt/Ptr | zeroed | Prevents serializer crash |

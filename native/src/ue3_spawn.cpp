@@ -83,9 +83,11 @@ static const bool     g_DoMultiply      = false;
 static const int      g_ExtraAIPerSpawn = 1;
 static const bool     g_DoubleAI        = false;
 
-// x2 multiplier. Reduced from 3 to 2 to avoid PhysX constraint crash
-// from too many simultaneous physics-simulated actors.
-static const int      g_RosterMult      = 2;
+// x3 multiplier. Was reduced to 2 when PhysX crashed, but root cause was
+// clones inheriting CountA=7 (spawning 7 enemies PER clone descriptor).
+// Now that clones force CountA=1, each clone = exactly 1 extra enemy, so
+// 3x is safe: a 4-desc roster grows to 12 descs = 8 extra enemies max.
+static const int      g_RosterMult      = 3;
 // Roster credit-back doubler: REJECTED. Inflating count past the array length
 // walks the director's monotonic cursor off the end -> OOB -> render crash.
 static const bool     g_DoubleRoster    = false;
@@ -131,12 +133,12 @@ static const bool     g_HuntCursor      = false; // HDR-DUMP diagnostic (done)
 // this run injects ZERO enemies (no leak, no crash) while we learn the layout.
 // Set false to resume real growing once we build a non-leaking clone.
 static const bool     g_DiagNoGrow      = false;
-// ABSOLUTE wave-size cap. CONFIRMED CRASH: doubling the 8-enemy "worship"
-// setpiece to 16 spiked memory + broke the scripted scene -> hard crash mid-
-// spawn (no OOB; the grow itself was clean). Big scripted waves are fragile and
-// memory-heavy in Infinite, so never let a grown wave exceed this many enemies.
-// Small waves (1->2, 2->4, 3->6) still double; an 8-wave is left untouched.
-static const int      g_MaxWaveTotal    = 8;  // reduced from 12: PhysX crashes with too many actors
+// ABSOLUTE wave-size cap (descriptor count, not total enemies). With the
+// CountA=1 fix, each descriptor = exactly 1 enemy, so this directly controls
+// max enemies per wave. 16 is conservative: 8-desc roster × 3x = 24 descs,
+// capped to 16 = 8 extra enemies. Previously crashed at 12+ because clones
+// inherited CountA=7 (producing 7 enemies EACH), now each clone = 1 enemy.
+static const int      g_MaxWaveTotal    = 16;
 // Require this much extra headroom PER added enemy on top of the base gate, so a
 // big add only proceeds with comfortable memory (defends the stale-poll spike).
 static const unsigned MULT_MEM_PER_ADD_MB = 60;
@@ -1081,24 +1083,38 @@ static void ApplyRosterGrow(void* roster)
             // (desc[1]) has both zero, so this yields a clean independent clone.
             *reinterpret_cast<unsigned*>(dst + OFF_DESC_RuntimeCnt) = 0;
             *reinterpret_cast<unsigned*>(dst + OFF_DESC_RuntimePtr) = 0;
-            // +0xCC: XAIScriptedSpawner back-reference. Same for all descs in a
-            // roster (not flagged by DESC-DIFF) but IS a live UObject*. When the
-            // spawner unloads, clones holding this pointer -> use-after-free.
-            *reinterpret_cast<unsigned*>(dst + 0xCC) = 0;
-            // +0xD8: Delegate {ObjectPtr, FName, FName}. The object pointer (first
-            // 4 bytes) references the spawner. Zero the entire 12-byte delegate so
-            // the clone is fully independent — no dangling UObject references.
-            memset(dst + 0xD8, 0, 12);
-            // Nudge the clone's spawn X so it does not perfectly overlap its
+            // +0xCC (Spawner) and +0xD8 (Delegate): KEEP INTACT.
+            // DESC-DIFF confirms ALL descriptors in a roster share the same Spawner
+            // and Delegate values. These are needed for post-spawn registration
+            // (damage system hookup). Zeroing them caused INVULNERABLE clones —
+            // the spawner's OnSpawn path couldn't register the clone for damage.
+            // The spawner outlives its spawned enemies (same level package), so
+            // there is no use-after-free risk during normal gameplay.
+            // Force clone's spawn count to 1 so it produces exactly ONE enemy.
+            // Without this, a clone inherits the source's CountA (e.g. 7) and the
+            // spawner creates 7 enemies from this SINGLE cloned descriptor —
+            // producing 14 extra from a 2-desc grow instead of the intended 2.
+            // This was the root cause of PhysX overload (24+ actors from one wave).
+            *reinterpret_cast<int*>(dst + OFF_DESC_CountA) = 1;
+            *reinterpret_cast<int*>(dst + OFF_DESC_CountB) = 1;
+            // Nudge the clone's spawn position so it does not perfectly overlap its
             // source (perfectly-coincident actors can fail collision/spawn).
             float* x = reinterpret_cast<float*>(dst + OFF_DESC_PosX);
             *x += 96.0f * (float)(i + 1);
+            // Also nudge Y (+0x64) to spread clones in 2D, not just along X.
+            float* y = reinterpret_cast<float*>(dst + OFF_DESC_PosX + 4);
+            *y += 64.0f * (float)((i + 1) % 2 == 0 ? 1 : -1);
         }
         *reinterpret_cast<int*>(r + OFF_TARRAY_NUM) = want;
         InterlockedIncrement(&g_GrowWaves);
         LONG tot = InterlockedAdd(&g_GrowAdded, add);
-        SLog("ROSTER-GROW array=0x%p Num %d->%d (Max=%d, +%d extra, "
-             "total-extra=%ld)", data, num, want, maxc, add, tot);
+        // Tally actual enemy count: original descs keep their CountA, clones = 1.
+        int totalEnemies = 0;
+        for (int j = 0; j < want; ++j)
+            totalEnemies += *reinterpret_cast<int*>((char*)data + (size_t)j * DESC_STRIDE + OFF_DESC_CountA);
+        SLog("ROSTER-GROW array=0x%p Num %d->%d (Max=%d, +%d descs, "
+             "totalEnemies=%d, total-extra=%ld)",
+             data, num, want, maxc, add, totalEnemies, tot);
         newLast = want;                // post-grow Num; drain won't re-trigger
     } else if (add > 0) {
         SLog("ROSTER-GROW GATED array=0x%p Num=%d->%d Max=%d (largest-free=%u MB < need %u)",
