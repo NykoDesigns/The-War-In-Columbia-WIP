@@ -37,6 +37,25 @@ When an AI spawn is requested:
 **Critical insight**: Step 7 uses the descriptor's `Spawner` (+0xCC) and `Delegate` (+0xD8)
 fields. Zeroing these in clones broke damage registration → invulnerable enemies.
 
+### Pool Exhaustion Behavior (confirmed Session #23)
+
+The pool has a **fixed capacity** (~20-32 entries per encounter, varies by level).
+When all entries are claimed:
+- `PoolTakePawn` returns NULL
+- `PlaceAndSpawn` still places a mesh body (the pawn actor exists in world)
+- `BindPawnToController` is skipped → **no AI controller assigned**
+- `BroadcastEvent` fires but the pawn has no damage receiver → **invulnerable**
+- Result: enemy appears idle, does not attack, cannot be killed
+
+Symptoms observed:
+- Soldiers standing in idle pose, ignoring the player (screenshot confirmed)
+- Specialized enemies (Firemen, Crows) missing entirely — their descriptors are processed
+  later in the roster, after the pool is already exhausted by regular soldiers
+- Consistent across multiple levels (not a one-off)
+
+**Fix**: Budget-based cap limits total enemies per wave to MAX_TOTAL_ENEMIES=20, ensuring
+pool never exhausts. Large waves that already exceed the cap get 0 clones added.
+
 ## 3. SpawnCore Gate Conditions
 
 ```c
@@ -224,52 +243,52 @@ EIP=0x74B7CA4E (system DLL)          badAddr=0x0000F3F4  ← accessing freed TAr
 
 ---
 
-## 11. Runtime Statistics (from last session)
+## 11. Runtime Statistics (Session #23 — latest clean session)
 
-- **Total spawns logged**: 2756
-- **Roster grows**: 27
-- **Crashes detected**: 24
-- **DESC-DIFF fields captured**: 67
+- **Duration**: 25m 57s
+- **Total spawns**: 265
+- **Roster grows**: 10 (39 total extra enemies across session)
+- **Crashes**: **0** ✅
+- **Peak totalEnemies per wave**: 41 (pre-fix — caused zombie spawns)
+- **Memory (free)**: 1.2-1.4 GB throughout (never a bottleneck)
+- **Level transitions**: 2 detected
 
-### Roster Grow History (last 10)
-  - `[01:15.484] ROSTER-GROW array=0x02156000 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[01:14.672] ROSTER-GROW array=0x98FF3000 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[00:54.000] ROSTER-GROW array=0x9AC94800 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[00:56.344] ROSTER-GROW array=0x597D6000 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[00:56.765] ROSTER-GROW array=0x96254800 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[00:53.156] ROSTER-GROW array=0x97B76000 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[01:11.234] ROSTER-GROW array=0x5F0EC000 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[01:09.062] ROSTER-GROW array=0x022F4800 Num 8->12 (Max=22, +4 extra, total-extra=4)`
-  - `[04:13.547] ROSTER-GROW array=0x7F601800 Num 2->4 (Max=4, +2 extra, total-extra=6)`
-  - `[04:42.890] ROSTER-GROW array=0x85B5D800 Num 8->12 (Max=22, +4 extra, total-extra=10)`
+### Roster Grow History (Session #23)
+```
+[04:38] ROSTER-GROW Num 2->4   (Max=4,  +2 clones, totalEnemies=14)
+[05:00] ROSTER-GROW Num 2->4   (Max=4,  +2 clones, totalEnemies=10)
+[06:30] ROSTER-GROW Num 6->16  (Max=22, +10 clones, totalEnemies=31) ⚠ HIGH
+[08:27] ROSTER-GROW Num 8->16  (Max=22, +8 clones,  totalEnemies=41) ⚠ PEAK
+[14:13] ROSTER-GROW Num 2->4   (Max=4,  +2 clones, totalEnemies=4)
+[14:47] ROSTER-GROW Num 8->16  (Max=22, +8 clones,  totalEnemies=24) ⚠ HIGH
+[18:17] ROSTER-GROW Num 2->4   (Max=4,  +2 clones, totalEnemies=12)
+[20:54] ROSTER-GROW Num 2->4   (Max=4,  +2 clones, totalEnemies=6)
+[22:02] ROSTER-GROW Num 2->4   (Max=4,  +2 clones, totalEnemies=11)
+[23:11] ROSTER-GROW Num 3->4   (Max=4,  +1 clones, totalEnemies=8)
+```
 
-### Crash Events
-  - `[02:20.953] *** CRASH code=0xC0000005 fault=0x5849AED8 (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x003EA000`
-  - `[02:29.406] *** CRASH code=0xC0000005 fault=0x00FFB573 (rva=0xBFB573, EIP-in=MODULE) READ badAddr=0x00000001`
-  - `[00:33.797] *** CRASH code=0xC0000005 fault=0x74B7CA4E (rva=0x0, EIP-in=SYSDLL) READ badAddr=0x0000F3F4`
-  - `[02:11.625] *** CRASH code=0xC0000005 fault=0x5849AED8 (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x003C0000`
-  - `[02:22.297] *** CRASH code=0xC0000005 fault=0x00FFB573 (rva=0xBFB573, EIP-in=MODULE) READ badAddr=0x00000001`
-  - `[02:02.031] *** CRASH code=0xC0000005 fault=0x598AAEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x003B5243`
-  - `[02:10.468] *** CRASH code=0xC0000005 fault=0x00FFB573 (rva=0xBFB573, EIP-in=MODULE) READ badAddr=0x00000001`
-  - `[00:57.000] *** CRASH code=0xC0000005 fault=0x00FFB573 (rva=0xBFB573, EIP-in=MODULE) READ badAddr=0x00000001`
-  - `[00:45.953] *** CRASH code=0xC0000005 fault=0x00FFB573 (rva=0xBFB573, EIP-in=MODULE) READ badAddr=0x00000001`
-  - `[06:33.282] *** CRASH code=0xC0000005 fault=0x00FFB573 (rva=0xBFB573, EIP-in=MODULE) READ badAddr=0x00000001`
-  - `[01:34.844] *** CRASH code=0xC0000005 fault=0x74B7CA4E (rva=0x0, EIP-in=SYSDLL) READ badAddr=0x0000F516`
-  - `[02:17.375] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C`
-  - `[02:10.625] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C`
-  - `[01:30.828] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C`
-  - `[00:54.000] *** CRASH code=0xC0000005 fault=0x74B7CA4E (rva=0x0, EIP-in=SYSDLL) READ badAddr=0x373A9090`
-  - `[01:40.953] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C`
-  - `[01:40.953] *** CRASH code=0xC0000005 fault=0xFFE889B4 (rva=0x0, EIP-in=OTHER) EXEC badAddr=0xFFE889B4`
-  - `[01:19.844] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C`
-  - `[02:05.140] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C`
-  - `[00:53.156] *** CRASH code=0xC0000005 fault=0x74B7CA4E (rva=0x0, EIP-in=SYSDLL) READ badAddr=0x3FA00000`
-  - `[00:03.344] *** CRASH code=0xC0000005 fault=0x00000000 (rva=0x0, EIP-in=OTHER) EXEC badAddr=0x00000000`
-  - `[02:10.563] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C`
-  - `[02:10.563] *** CRASH code=0xC0000005 fault=0x00496FC1 (rva=0x96FC1, EIP-in=MODULE) WRITE badAddr=0x001776F8`
-  - `[05:02.437] *** CRASH code=0xC0000005 fault=0x5619E693 (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0000002C`
+### Pawn Pool Exhaustion Discovery
 
-## 11. Function Database
+The high-totalEnemies waves (31, 41, 24) caused **zombie spawns**:
+- Pawn pool is fixed size (~20-32 entries per encounter)
+- When all entries claimed: PoolTakePawn returns NULL
+- PlaceAndSpawn still renders mesh body → visible idle enemy
+- BindPawnToController skipped → no AI, no damage registration
+- Later descriptors (Firemen, Crows) starved of pool entries → missing enemies
+
+**Fix deployed**: Budget-based cap (MAX_TOTAL_ENEMIES=20) — awaiting verification.
+
+### Historical Crash Summary (all resolved)
+
+| Pattern | Count | Sessions | Fix |
+|---------|:-----:|----------|-----|
+| memcpy/streaming | 8 | 1-3 | JLE→JBE patch |
+| 0xBFB573 use-after-free | 6 | 1-7 | Same patch (downstream) |
+| System DLL (freed TArray) | 4 | 1-3 | Same patch |
+| PhysX constraint | 1 | 21 | CountA=1 |
+| Module WRITE (stream buf) | 1 | 21 | JLE→JBE patch |
+
+## 12. Function Database
 
 Total functions decompiled: **23**
 

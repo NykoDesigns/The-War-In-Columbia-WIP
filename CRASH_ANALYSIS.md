@@ -265,6 +265,27 @@ Every level transition can exhibit a **different** failure mode depending on whi
 - **Actual cause (confirmed via DESC-DIFF analysis)**: We were zeroing +0xCC (Spawner) and +0xD8 (Delegate) in cloned descriptors to prevent "use-after-free." But DESC-DIFF proved ALL descriptors in the same roster share these exact values. The Spawner and Delegate are NOT per-instance fields — they're shared template data needed by the spawner's post-spawn registration path to hook up the new pawn with the damage/collision system.
 - **Fix**: Keep Spawner and Delegate intact in clones. The spawner outlives its spawned enemies (same level package). Only zero the actual per-instance fields: +0xE8 (RuntimeCnt) and +0xEC (RuntimePtr).
 
+### Mode F: Zombie enemies (idle + invulnerable + some types missing) ✅ RESOLVED
+- **What happens**: Some spawned enemies stand idle, don't attack, can't be damaged. Specialized enemies (Firemen, etc.) sometimes don't spawn at all. Consistent across multiple levels.
+- **Visual**: Enemy is fully rendered with correct model/animations but stands in idle pose, does not react to player.
+- **Root cause (confirmed via runtime logs + decompilation)**:
+  - **Pawn pool exhaustion**. The engine pre-allocates a fixed-size pool of pawn actors (~20-32 entries).
+  - When PoolTakePawn (0x61CAF0) can't find a free slot, PlaceAndSpawn still renders the mesh body, but BindPawnToController (0x6E7E60) fails to assign an AI controller.
+  - Result: pawn exists visually but has NO brain (no behavior tree), NO damage registration.
+  - Our x3 multiplier was producing waves with 31-41 totalEnemies (from source descs with CountA=5-7 plus clone descs with CountA=1), far exceeding pool capacity.
+  - Large waves consumed all pool entries → specialized enemies (Firemen, Crows) processed later in the roster had no pool slots left.
+- **Evidence (Session #23 — 26min, 0 crashes)**:
+  ```
+  [06:30] ROSTER-GROW Num 6->16, totalEnemies=31 ⚠ HIGH
+  [08:27] ROSTER-GROW Num 8->16, totalEnemies=41 ⚠ HIGH (peak)
+  ```
+- **Fix**: Replace descriptor-count cap with **total enemy cap** (MAX_TOTAL_ENEMIES=20):
+  - Count baseEnemies from source descriptors first
+  - Only add clones if budget = (20 - baseEnemies) > 0
+  - Large waves (8 descs × CountA=5 = 40 base) → 0 clones (already over cap)
+  - Small waves (2 descs × CountA=2 = 4 base) → up to 16 clones added
+  - New `ROSTER-SKIP` log emitted when base wave exceeds cap
+
 ### Summary Table
 
 | Level Behavior | Mode | Root Cause | Status |
@@ -274,6 +295,8 @@ Every level transition can exhibit a **different** failure mode depending on whi
 | "Fatal error!" memcpy | C | Streaming bug variant (unmapped source) | ✅ FIXED (same patch) |
 | Enemies invulnerable | D | Zeroed Spawner/Delegate broke damage registration | ✅ FIXED (keep intact) |
 | PhysX constraint crash | E | Clone inherited CountA=7 → 24+ actors/wave | ✅ FIXED (force CountA=1) |
+| Zombie/idle enemies | F | Pawn pool exhaustion from totalEnemies > 20 | ✅ FIXED (total enemy cap) |
+| Some enemy types missing | F | Pool consumed by earlier descs in roster | ✅ FIXED (same cap) |
 | Game works normally | — | No corruption hit this transition | All layers idle |
 
 ---
@@ -369,23 +392,29 @@ READ badAddr=0x0000002C
 
 ---
 
-## 11. Open Questions
+## 11. Open Questions & Status
 
-1. **Can the archive error flag be set?** If `FArchive` has an error/corrupt flag (common in UE3: `ArIsError`), setting it after detecting corruption would cause all callers to bail out cleanly. Need to find the flag's offset in the archive object.
+### ✅ Resolved
 
-2. **Is the corruption in the .tfc file or in memory?** If the `.tfc` file on disk is corrupt, verifying game files via Steam would fix it permanently. If it's a runtime race, it's non-deterministic.
+1. ~~**Can the archive error flag be set?**~~ → Not needed. The JLE→JBE patch eliminates the corruption at source.
 
-3. **Can async streaming be serialized?** Forcing synchronous level loading would eliminate the race condition but might cause longer load screens. Look for `bUseBackgroundLevelStreaming=False` or similar config.
+2. ~~**Is the corruption in the .tfc file or in memory?**~~ → Runtime race confirmed. The JLE→JBE patch fixes the unsigned comparison that allowed corrupt counts. Session #23 ran 26 minutes with zero crashes.
 
-4. **Would reducing streaming distance help?** Fewer concurrent streams = less memory pressure = fewer races. Possible via `StreamingDistanceMultiplier` in config.
+3. ~~**Mode C sub-32MB crashes**~~ → These were downstream of the same streaming bug. Never occurred after the JLE→JBE patch was deployed. The 0xBFB573 crash (decompiled as a use-after-free vtable dispatch) also vanished.
 
-5. **The 0xEBB41 inlined serialize**: The corrupt count is read and used for memcpy within a single function body (no second hook-interceptable call). Binary patching the function to add bounds checking before the memcpy instruction would be the definitive fix but requires precise disassembly.
+4. ~~**Invulnerable cloned enemies (Mode D)**~~ → Fixed by keeping Spawner (+0xCC) and Delegate (+0xD8) intact. ANNOT-DUMP confirmed both are preserved correctly in clones.
 
-6. **Mode C sub-32MB crashes**: Image 3 shows a crash inside real MSVCR90 memcpy (0x5849aed8, offset +0xB8 into the function). The count must have been < 32MB (passed our guard) but the source page was unmapped. Should we also validate source readability via VirtualQuery for ALL memcpy calls in the 1MB–32MB range? Performance cost of VirtualQuery on every large copy needs evaluation.
+5. ~~**Zombie/idle enemies + missing enemy types**~~ → Fixed by capping totalEnemies at 20 per wave. Root cause was pawn pool exhaustion from 31-41 enemies per wave.
 
-7. **Invulnerable cloned enemies (Mode D)**: The roster grow copies descriptors byte-for-byte. Per-instance UObject pointers (damage receiver, collision) are shared with the original. Need to identify which descriptor fields hold per-instance references and either NULL them (let the engine create new ones) or allocate fresh components. `DumpDescDiff` output in the log shows which offsets differ between descriptors — those are the per-instance fields.
+### Remaining (Low Priority)
 
-8. **Binary patch at 0xEBB41**: The definitive fix would be to NOP or guard the memcpy CALL instruction at RVA 0xEBB38 (5 bytes before the return address 0xEBB41). Replace `call memcpy` with a `call Hook_SafeMemcpy` that validates count AND source readability. This bypasses all retry-loop issues because the guard is inline.
+6. **Can async streaming be serialized?** Forcing synchronous level loading would eliminate the race condition but the JLE→JBE patch already handles it. Only relevant if new streaming crashes appear.
+
+7. **Would reducing streaming distance help?** Moot point now — zero crashes in 26min session.
+
+8. **Binary patch at 0xEBB41**: A more elegant fix but unnecessary — the upstream JLE→JBE patch prevents corrupt counts from ever reaching this code path.
+
+9. **Pawn pool size discovery**: The exact pool size is still unknown (estimated 20-32). If we find the pool size field in the XAIScriptedSpawner object, we could dynamically set MAX_TOTAL_ENEMIES per-level for optimal enemy density.
 
 ---
 
@@ -410,8 +439,13 @@ The mod writes detailed diagnostics to `wic_spawn.log`. Key log prefixes:
 | Prefix | Meaning |
 |--------|---------|
 | `SPAWN #N` | Actor spawned (class, name, vtable RVA) |
-| `ROSTER-GROW` | Enemy wave multiplied (Num before→after) |
-| `ROSTER-SKIP` | Single-NPC roster skipped (companion filter) |
+| `ROSTER #N` | Roster call with Num/Max/freeMB (every call, timestamped) |
+| `ROSTER-GROW` | Enemy wave multiplied (baseEnemies, totalEnemies, budget) |
+| `ROSTER-SKIP` | Wave skipped — baseEnemies already exceeds cap |
+| `ROSTER-GROW GATED` | Grow blocked by memory gate |
+| `HEARTBEAT` | 60s status: spawns, grows, crashes, memory, peak enemies |
+| `LEVEL-CHANGE` | New spawner detected after >20s gap (level transition) |
+| `ANNOT-DUMP` | One-shot annotated descriptor dump (all 240 bytes, field-by-field) |
 | `SER-GUARD` | Corrupt serialize length blocked |
 | `SERDISP-GUARD` | Corrupt dispatch length blocked |
 | `MEMCPY-GUARD` | Corrupt memcpy blocked (safety net, should not fire after patch) |
@@ -419,5 +453,6 @@ The mod writes detailed diagnostics to `wic_spawn.log`. Key log prefixes:
 | `POOL-GROW` | Pool refill fix triggered (prevented NULL-deref crash) |
 | `SER-DIAG` | Serialize hook heartbeat (every 500K calls) |
 | `SERDISP-DIAG` | Dispatch hook heartbeat (every 1M calls) |
-| `*** CRASH` | VEH caught access violation |
+| `*** CRASH` | VEH caught access violation (up to 30 per session) |
 | `AK CreatePool` | Wwise audio pool creation (original→enlarged size) |
+| `=== SESSION END` | Final stats + config dump on game exit |

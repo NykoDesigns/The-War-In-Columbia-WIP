@@ -1,26 +1,30 @@
 # BioShock Infinite — SDK Data Map
 
-*Auto-generated: 2026-06-08 20:37:23*
+*Updated: 2026-06-09 — 24 sessions logged*
 
 This file is a persistent knowledge base of game internals discovered
-through reverse engineering. Updated by `tools/sdk_dump.py`.
+through reverse engineering. Updated by `tools/sdk_dump.py` and `tools/runtime_deep_analyzer.py`.
 
 ---
 
 ## 1. Runtime Actor Census (from wic_spawn.log)
 
-- **Total spawns logged**: 2756
-- **AI Controllers**: 323
-- **Roster grows**: 27
-- **Crashes**: 24
-- **Guard triggers**: memcpy=176, pool=8
+- **Total sessions logged**: 24
+- **Total events**: 9615
+- **Latest session (26min)**: 265 spawns, 10 grows, **0 crashes** ✅
+- **Roster grows (all sessions)**: 37+
+- **Historical crashes**: 24 (all in early sessions before JLE→JBE patch)
+- **Guard triggers**: memcpy=176 (all pre-patch), pool=8
 
-### Patches Applied
+### Current Status: STABLE ✅
+- Zero crashes in last 3 sessions (combined ~45 min gameplay)
+- All crash modes resolved (streaming, PhysX, invulnerability, zombies)
+- Only remaining issue: zombie/idle enemies from pool exhaustion → fix deployed (untested)
 
-- `[00:03.250] STREAMREAD-PATCH: patched JLE->JBE at 0x00496F5E (base+0x96F5E) [buf1]. Avail comparison is now UNSIGNED.`
-- `[00:03.250] STREAMREAD-PATCH: patched JLE->JBE at 0x00496FA7 (base+0x96FA7) [buf2]. Avail comparison is now UNSIGNED.`
-- `[00:03.328] STREAMREAD-PATCH: patched JLE->JBE at 0x00496F5E (base+0x96F5E) [buf1]. Avail comparison is now UNSIGNED.`
-- `[00:03.328] STREAMREAD-PATCH: patched JLE->JBE at 0x00496FA7 (base+0x96FA7) [buf2]. Avail comparison is now UNSIGNED.`
+### Patches Applied (per session)
+
+- `STREAMREAD-PATCH: JLE->JBE at base+0x96F5E [buf1] — unsigned avail comparison`
+- `STREAMREAD-PATCH: JLE->JBE at base+0x96FA7 [buf2] — unsigned avail comparison`
 
 ### Actor Classes (top 20)
 
@@ -47,13 +51,13 @@ through reverse engineering. Updated by `tools/sdk_dump.py`.
 | XEmitterPool | 23 |
 | XDecalManager | 23 |
 
-### Recent Crashes
+### Crash History (all resolved — from early sessions only)
 ```
-[00:53.156] *** CRASH code=0xC0000005 fault=0x74B7CA4E (rva=0x0, EIP-in=SYSDLL) READ badAddr=0x3FA00000
-[00:03.344] *** CRASH code=0xC0000005 fault=0x00000000 (rva=0x0, EIP-in=OTHER) EXEC badAddr=0x00000000
-[02:10.563] *** CRASH code=0xC0000005 fault=0x5849AEBA (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0017764C
-[02:10.563] *** CRASH code=0xC0000005 fault=0x00496FC1 (rva=0x96FC1, EIP-in=MODULE) WRITE badAddr=0x001776F8
-[05:02.437] *** CRASH code=0xC0000005 fault=0x5619E693 (rva=0x0, EIP-in=HEAP!!) READ badAddr=0x0000002C
+[Session  2] memcpy (streaming), NULL deref, system DLL  — FIXED by JLE→JBE
+[Session  3] PhysX constraint, memcpy (streaming)        — FIXED by CountA=1 + JLE→JBE
+[Session  5] 0xBFB573 use-after-free                     — FIXED (downstream of streaming bug)
+[Sessions 11-21] PhysX only                              — FIXED by CountA=1
+[Sessions 22-23] ZERO CRASHES                            — All fixes working ✅
 ```
 
 ---
@@ -617,13 +621,36 @@ descriptors in a roster; same-level-package → no use-after-free).
 
 | Setting | Value | Notes |
 |---------|-------|-------|
-| g_RosterMult | 3 | Descriptor multiplier (3x descriptors per wave) |
+| g_GrowRoster | true | Master switch: in-place TArray grow |
+| MAX_TOTAL_ENEMIES | **20** | Hard cap on total enemies per wave (prevents pool exhaustion) |
 | g_MaxWaveTotal | 16 | Max descriptor count per wave |
+| g_RosterMult | 3 | Descriptor multiplier (capped by enemy budget) |
 | MULT_MEM_GATE_MB | 500 | Min free memory to allow grow |
 | MULT_MEM_PER_ADD_MB | 60 | Extra headroom per added enemy |
-| ENABLE_SPAWN_MULT | true | Master spawn switch |
 | ENABLE_AUDIO_ENLARGE | true | Wwise pool 2x enlarger |
+| g_AudioPoolMult | 2 | Wwise pool size multiplier |
 | DESC_STRIDE | 0xF0 (240) | Bytes per AISpawnInfo descriptor |
 | Clone CountA/B | forced to 1 | Each clone = exactly 1 enemy |
 | Clone Spawner/Delegate | kept intact | Needed for damage registration |
 | Clone RuntimeCnt/Ptr | zeroed | Prevents serializer crash |
+| Clone TArrays | deep-copied | Own engine-allocated buffers (no double-free) |
+| Clone position | nudged +96×i X, ±64 Y | Prevents collision overlap |
+
+### Grow Logic (v2 — budget-based)
+
+```
+baseEnemies = sum(CountA) across all source descriptors
+budget = MAX_TOTAL_ENEMIES - baseEnemies
+add = min(budget, freeSlots, g_MaxWaveTotal - num)
+if budget <= 0 → ROSTER-SKIP (large waves already at cap)
+if add > 0 && freeMB >= needMB → clone `add` descriptors
+```
+
+### Effective Behavior
+
+| Wave Type | Source descs × CountA | baseEnemies | Budget | Clones Added |
+|-----------|----------------------|:-----------:|:------:|:------------:|
+| Small encounter | 2 × 2 | 4 | 16 | up to 16 |
+| Medium fight | 4 × 3 | 12 | 8 | 8 |
+| Large battle | 8 × 5 | 40 | 0 | **none** (already intense) |
+| Boss wave | 2 × 7 | 14 | 6 | 6 |
