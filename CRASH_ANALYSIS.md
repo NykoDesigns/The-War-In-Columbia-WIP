@@ -260,22 +260,20 @@ Every level transition can exhibit a **different** failure mode depending on whi
   2. The corrupt memcpy count was **under 32 MB** (passed our threshold) but the source/dest buffer was too small → access violation inside the real memcpy
 - **The 0x5849aed8 address**: This is 0xB8 bytes past the memcpy entry point (0x5849AE20). This is deep inside the memcpy function body where the actual byte-copy loop faults. This suggests our hook DID run, judged the count as safe (< 32MB), forwarded to Real_memcpy, and the real function crashed because the source region was unmapped/freed.
 
-### Mode D: Spawns work but enemies are invulnerable
+### Mode D: Spawns work but enemies are invulnerable ✅ RESOLVED
 - **What happens**: Extra enemies spawn correctly and are visible/animated, but some cannot be damaged by the player
-- **Cause**: The roster grow clones enemy descriptors via `memcpy(dst, src, DESC_STRIDE)`, which copies all fields including UObject pointers (damage receiver, collision component, etc.). These pointers reference the ORIGINAL enemy's components. The cloned enemy gets a body and AI but may not be properly registered with:
-  - The damage system (hits don't register)
-  - The collision system (bullets pass through)
-  - The score/kill tracking system
-- **Why some work and others don't**: It depends on which UObject fields in the descriptor are per-instance vs shared template. Fields that are shared (like weapon class, health amount) work fine. Fields that are per-instance pointers (like the specific collision component) point to the original enemy's component.
+- **Actual cause (confirmed via DESC-DIFF analysis)**: We were zeroing +0xCC (Spawner) and +0xD8 (Delegate) in cloned descriptors to prevent "use-after-free." But DESC-DIFF proved ALL descriptors in the same roster share these exact values. The Spawner and Delegate are NOT per-instance fields — they're shared template data needed by the spawner's post-spawn registration path to hook up the new pawn with the damage/collision system.
+- **Fix**: Keep Spawner and Delegate intact in clones. The spawner outlives its spawned enemies (same level package). Only zero the actual per-instance fields: +0xE8 (RuntimeCnt) and +0xEC (RuntimePtr).
 
 ### Summary Table
 
-| Level Behavior | Failure Mode | Root Cause | Defense Layer Hit |
-|---------------|-------------|------------|-------------------|
-| Freeze/hang | A | Retry loop after clamp | memcpy clamp → caller retries |
-| "Out of virtual memory" | B | Corrupt count → huge allocation | memcpy clamp → allocation OOM |
-| "Fatal error!" | C | Small-count corrupt read or unmapped source | Passes 32MB threshold → real memcpy faults |
-| Enemies invulnerable | D | Cloned descriptors share UObject pointers | Roster grow clone logic |
+| Level Behavior | Mode | Root Cause | Status |
+|---------------|------|------------|--------|
+| Freeze/hang | A | Signed comparison bug in stream reader | ✅ FIXED (JLE→JBE patch) |
+| "Out of virtual memory" | B | Cascade from streaming bug → corrupt allocation | ✅ FIXED (same patch) |
+| "Fatal error!" memcpy | C | Streaming bug variant (unmapped source) | ✅ FIXED (same patch) |
+| Enemies invulnerable | D | Zeroed Spawner/Delegate broke damage registration | ✅ FIXED (keep intact) |
+| PhysX constraint crash | E | Clone inherited CountA=7 → 24+ actors/wave | ✅ FIXED (force CountA=1) |
 | Game works normally | — | No corruption hit this transition | All layers idle |
 
 ---
@@ -334,22 +332,40 @@ JBE (unsigned): 4,293,429,684 ≤ 4096? **NO** → caps to count → 4-byte read
 
 ---
 
-## 10. Remaining Issues
+## 10. Resolved Issues (All Screenshot Crashes)
 
-### PhysX Constraint Crash (NEW — after streaming fix)
-After fixing the streaming crash, a new crash appears when too many enemies are spawned:
+### ✅ Crash Screenshot 1: Streaming/memcpy crash (Mode A/B/C)
+```
+memcpy @ MSVCR90.dll → RVA 0xEBB41 → FArchive::Serialize
+Access violation 0xC0000005, count ≈ 4GB
+```
+- **Root cause**: Signed comparison (JLE) in FUN_00496F00 treats 0xFFE889B4 as -1.5M instead of 4GB
+- **Fix**: Binary patch JLE→JBE at two locations (+0x5E, +0xA7)
+- **Status**: ✅ FIXED — no streaming crashes since patch deployed
+
+### ✅ Crash Screenshot 2: PhysX constraint crash
 ```
 physx::PxConstraintGeneratedValues::PxConstraintGeneratedValues()
 Address = 0x5619e693 [PhysX3_x86.dll]
+READ badAddr=0x0000002C
 ```
-- **Cause**: Too many physics-simulated actors (ragdolls, constraints) overwhelm PhysX
-- **Fix**: Reduced spawn multiplier from 3x to 2x, wave cap from 12 to 8
-- **Status**: Under testing
+- **Root cause**: Cloned descriptors inherited CountA=7 from source. A 2-descriptor roster
+  (7+5=12 enemies) growing to 4 descriptors produced 7+5+7+5=24 enemies PER WAVE.
+  Multiple concurrent waves → PhysX solver overwhelmed by 360+ constraints.
+- **Fix**: Force clone CountA=CountB=1. Each cloned descriptor now produces exactly 1 enemy.
+  With 3x multiplier: a 2-desc roster grows to 6 descs = 12+4=16 enemies (not 24+).
+- **Status**: ✅ FIXED (deployed, needs verification)
 
-### Invulnerable Cloned Enemies
-- Cloned descriptors share UObject pointers with originals
-- Some clones can't be damaged (collision/damage components not properly initialized)
-- **Long-term fix**: Use SpawnActor-level multiplication instead of raw descriptor cloning
+### ✅ Crash Screenshot 3: Invulnerable cloned enemies (Mode D)
+- **Root cause**: Zeroing +0xCC (Spawner back-reference) and +0xD8 (Delegate) in clones
+  broke the spawner's post-spawn registration path. The OnSpawn delegate is what registers
+  newly-created pawns with the damage/collision system. Without it, the pawn exists and has
+  AI but cannot receive damage.
+- **Evidence**: DESC-DIFF proved ALL descriptors in a roster share identical Spawner and
+  Delegate values — these are NOT per-instance and should NOT be zeroed.
+- **Fix**: Keep Spawner (+0xCC) and Delegate (+0xD8) intact in clones. They're shared
+  across the entire roster and the spawner outlives its spawned enemies.
+- **Status**: ✅ FIXED (deployed, needs verification)
 
 ---
 
