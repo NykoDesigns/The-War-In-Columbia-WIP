@@ -1115,6 +1115,45 @@ static void ApplyRosterGrow(void* roster)
         SLog("ROSTER-GROW array=0x%p Num %d->%d (Max=%d, +%d descs, "
              "totalEnemies=%d, total-extra=%ld)",
              data, num, want, maxc, add, totalEnemies, tot);
+        // ONE-SHOT: annotated dump of clone vs source for deep analysis
+        static volatile LONG s_annotDumped = 0;
+        if (InterlockedCompareExchange(&s_annotDumped, 1, 0) == 0) {
+            char* src0 = (char*)data;
+            char* cln0 = (char*)data + (size_t)num * DESC_STRIDE;
+            SLog("ANNOT-DUMP: source desc[0] vs clone desc[%d] (first clone):", num);
+            // Annotated fields
+            struct { unsigned off; const char* name; int sz; bool isPtr; } fields[] = {
+                {0x00,"GammaPack",4,true}, {0x04,"PawnArch",4,true},
+                {0x08,"PawnLabels.Data",4,true}, {0x0C,"CountA",4,false}, {0x10,"CountB",4,false},
+                {0x14,"PawnAppearanceOvr",4,true}, {0x20,"LootList.Data",4,true},
+                {0x2C,"BoolFlags",4,false},
+                {0x30,"LootOnKill.Data",4,true}, {0x3C,"InventoryList.Data",4,true},
+                {0x58,"Faction",8,false},
+                {0x60,"SpawnLoc.X",4,false}, {0x64,"SpawnLoc.Y",4,false},
+                {0x68,"SpawnLoc.Z",4,false}, {0x6C,"SpawnLoc.Section",4,false},
+                {0x80,"FloatSection",4,false},
+                {0x98,"CaptainPawn",4,true}, {0x9C,"PatrolPath",4,true},
+                {0xA4,"AIRole",4,true},
+                {0xC8,"FrobEvent",4,true}, {0xCC,"Spawner",4,true},
+                {0xD0,"SpawnerLevel",8,false},
+                {0xD8,"Delegate.Obj",4,true}, {0xDC,"Delegate.FName1",4,false},
+                {0xE0,"Delegate.FName2",4,false},
+                {0xE4,"ScenarioIdx",4,false}, {0xE8,"RuntimeCnt",4,false}, {0xEC,"RuntimePtr",4,true},
+            };
+            for (auto& f : fields) {
+                unsigned sv = *reinterpret_cast<unsigned*>(src0 + f.off);
+                unsigned cv = *reinterpret_cast<unsigned*>(cln0 + f.off);
+                const char* diff = (sv != cv) ? " DIFF" : "";
+                char extra[128] = "";
+                if (f.isPtr && cv && cv >= 0x10000000u && cv < 0xC0000000u) {
+                    char nm[64], cn[64];
+                    if (ResolveObjNameClass(reinterpret_cast<void*>(cv), nm, sizeof nm, cn, sizeof cn))
+                        sprintf(extra, " -> %s (%s)", nm, cn);
+                }
+                SLog("  +0x%02X %-20s src=%08X cln=%08X%s%s",
+                     f.off, f.name, sv, cv, diff, extra);
+            }
+        }
         newLast = want;                // post-grow Num; drain won't re-trigger
     } else if (add > 0) {
         SLog("ROSTER-GROW GATED array=0x%p Num=%d->%d Max=%d (largest-free=%u MB < need %u)",
