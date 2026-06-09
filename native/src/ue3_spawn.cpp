@@ -1047,18 +1047,32 @@ static void ApplyRosterGrow(void* roster)
         if (s) s->lastNum = num;
         return;
     }
-    // Fresh wave (Num increased). Grow within capacity, ONCE.
-    int want = num * g_RosterMult;
-    if (want > maxc)           want = maxc;            // clamp to allocation
-    if (want > g_MaxWaveTotal) want = g_MaxWaveTotal;  // clamp to abs cap
-    if (want < num)            want = num;             // never shrink a wave
-    int add  = want - num;
+    // Fresh wave (Num increased). Grow within capacity, using a TOTAL ENEMY
+    // cap (not just descriptor count) to prevent pawn pool exhaustion — which
+    // was causing zombie spawns (idle + invulnerable enemies with no AI).
     int newLast = num;
-    // Scale the required headroom with the number of enemies we are adding so a
-    // big add only fires with comfortable memory (guards the ~5s stale poll).
+
+    // Count how many enemies the ORIGINAL wave already spawns.
+    int baseEnemies = 0;
+    for (int j = 0; j < num; ++j)
+        baseEnemies += *reinterpret_cast<int*>((char*)data + (size_t)j * DESC_STRIDE + OFF_DESC_CountA);
+
+    // Budget: how many MORE enemies can we add before hitting the pool cap?
+    // The pawn pool is typically ~20-32 entries. Stay well within that to avoid
+    // exhausting it (which leaves pawns with no AI controller → zombie spawns).
+    static const int MAX_TOTAL_ENEMIES = 20; // hard cap on total enemies per wave
+    int budget = MAX_TOTAL_ENEMIES - baseEnemies;
+    if (budget < 0) budget = 0;
+
+    // Also respect descriptor-count limits.
+    int maxDescs = maxc - num;                         // free slots in TArray
+    if (maxDescs > g_MaxWaveTotal - num) maxDescs = g_MaxWaveTotal - num;
+    if (maxDescs < 0) maxDescs = 0;
+    int add = budget < maxDescs ? budget : maxDescs;   // each clone adds 1 enemy
+
+    // Scale the required headroom with the number of enemies we are adding.
     unsigned needMB = MULT_MEM_GATE_MB + (unsigned)add * MULT_MEM_PER_ADD_MB;
     if (g_DiagNoGrow) {
-        // Diagnostic-only: layout captured via DumpDescDiff; inject nothing.
         if (!s) {
             int pos = (int)(InterlockedIncrement(&g_GrowPos) - 1) % GROW_TBL;
             s = &g_GrowTbl[pos]; s->array = data;
@@ -1068,62 +1082,47 @@ static void ApplyRosterGrow(void* roster)
     }
     if (add > 0 && MemMonLargestFreeMB() >= needMB) {
         EnsureArrFields((char*)data); // resolve TArray element sizes once
+        int cloned = 0;
         for (int i = 0; i < add; ++i) {
-            char* src = (char*)data + (size_t)(i % num) * DESC_STRIDE;
-            char* dst = (char*)data + (size_t)(num + i)  * DESC_STRIDE;
+            // Pick a source descriptor to clone. Prefer sources with LOW CountA
+            // (small squads) since those are less likely to be "special" enemies.
+            // Round-robin through sources.
+            int srcIdx = i % num;
+            char* src = (char*)data + (size_t)srcIdx * DESC_STRIDE;
+            char* dst = (char*)data + (size_t)(num + cloned) * DESC_STRIDE;
             memcpy(dst, src, DESC_STRIDE);
-            // LEAK FIX (robust): give the clone its OWN engine-allocated copy of
-            // each embedded TArray so it is a fully valid, independent enemy
-            // (keeps boss inventory/loot) yet shares no buffer -> no double-free.
-            // Unsafe/empty arrays fall back to an empty header inside the helper.
+            // Deep-copy TArrays to prevent double-free.
             for (unsigned t = 0; t < _countof(DESC_TARRAY_OFFS); ++t)
                 CloneDetachTArray(dst, src, g_ArrFields[t]);
-            // Detach the trailing per-enemy runtime pointer (+0xEC) + its count/
-            // flags word (+0xE8). DESC-DIFF proved +0xEC is a per-instance heap
-            // pointer the clone would otherwise alias -> use-after-free -> the
-            // ~1 GB memcpy crash in the streaming serializer. A valid descriptor
-            // (desc[1]) has both zero, so this yields a clean independent clone.
+            // Zero runtime per-instance fields (prevents streaming crash).
             *reinterpret_cast<unsigned*>(dst + OFF_DESC_RuntimeCnt) = 0;
             *reinterpret_cast<unsigned*>(dst + OFF_DESC_RuntimePtr) = 0;
-            // +0xCC (Spawner) and +0xD8 (Delegate): KEEP INTACT.
-            // DESC-DIFF confirms ALL descriptors in a roster share the same Spawner
-            // and Delegate values. These are needed for post-spawn registration
-            // (damage system hookup). Zeroing them caused INVULNERABLE clones —
-            // the spawner's OnSpawn path couldn't register the clone for damage.
-            // The spawner outlives its spawned enemies (same level package), so
-            // there is no use-after-free risk during normal gameplay.
-            // Force clone's spawn count to 1 so it produces exactly ONE enemy.
-            // Without this, a clone inherits the source's CountA (e.g. 7) and the
-            // spawner creates 7 enemies from this SINGLE cloned descriptor —
-            // producing 14 extra from a 2-desc grow instead of the intended 2.
-            // This was the root cause of PhysX overload (24+ actors from one wave).
+            // +0xCC (Spawner) and +0xD8 (Delegate): KEEP INTACT for damage reg.
+            // Force clone CountA/B = 1 (one enemy per clone descriptor).
             *reinterpret_cast<int*>(dst + OFF_DESC_CountA) = 1;
             *reinterpret_cast<int*>(dst + OFF_DESC_CountB) = 1;
-            // Nudge the clone's spawn position so it does not perfectly overlap its
-            // source (perfectly-coincident actors can fail collision/spawn).
+            // Nudge position to avoid collision overlap.
             float* x = reinterpret_cast<float*>(dst + OFF_DESC_PosX);
-            *x += 96.0f * (float)(i + 1);
-            // Also nudge Y (+0x64) to spread clones in 2D, not just along X.
+            *x += 96.0f * (float)(cloned + 1);
             float* y = reinterpret_cast<float*>(dst + OFF_DESC_PosX + 4);
-            *y += 64.0f * (float)((i + 1) % 2 == 0 ? 1 : -1);
+            *y += 64.0f * (float)((cloned + 1) % 2 == 0 ? 1 : -1);
+            ++cloned;
         }
+        int want = num + cloned;
         *reinterpret_cast<int*>(r + OFF_TARRAY_NUM) = want;
         InterlockedIncrement(&g_GrowWaves);
         InterlockedIncrement(&g_LevelGrows);
-        LONG tot = InterlockedAdd(&g_GrowAdded, add);
-        // Tally actual enemy count: original descs keep their CountA, clones = 1.
-        int totalEnemies = 0;
-        for (int j = 0; j < want; ++j)
-            totalEnemies += *reinterpret_cast<int*>((char*)data + (size_t)j * DESC_STRIDE + OFF_DESC_CountA);
+        LONG tot = InterlockedAdd(&g_GrowAdded, cloned);
+        int totalEnemies = baseEnemies + cloned;
         // Track peak for heartbeat
         LONG prev = g_PeakEnemies;
         while (totalEnemies > prev) {
             if (InterlockedCompareExchange(&g_PeakEnemies, totalEnemies, prev) == prev) break;
             prev = g_PeakEnemies;
         }
-        SLog("ROSTER-GROW array=0x%p Num %d->%d (Max=%d, +%d descs, "
-             "totalEnemies=%d, total-extra=%ld)",
-             data, num, want, maxc, add, totalEnemies, tot);
+        SLog("ROSTER-GROW array=0x%p Num %d->%d (Max=%d, +%d clones, "
+             "baseEnemies=%d totalEnemies=%d budget=%d total-extra=%ld)",
+             data, num, want, maxc, cloned, baseEnemies, totalEnemies, budget, tot);
         // ONE-SHOT: annotated dump of clone vs source for deep analysis
         static volatile LONG s_annotDumped = 0;
         if (InterlockedCompareExchange(&s_annotDumped, 1, 0) == 0) {
@@ -1164,9 +1163,13 @@ static void ApplyRosterGrow(void* roster)
             }
         }
         newLast = want;                // post-grow Num; drain won't re-trigger
+    } else if (budget <= 0) {
+        // Base wave already at or over enemy cap — no room to add clones.
+        SLog("ROSTER-SKIP array=0x%p Num=%d baseEnemies=%d >= cap=%d (no clones added)",
+             data, num, baseEnemies, MAX_TOTAL_ENEMIES);
     } else if (add > 0) {
-        SLog("ROSTER-GROW GATED array=0x%p Num=%d->%d Max=%d (largest-free=%u MB < need %u)",
-             data, num, want, maxc, MemMonLargestFreeMB(), needMB);
+        SLog("ROSTER-GROW GATED array=0x%p Num=%d add=%d (largest-free=%u MB < need %u)",
+             data, num, add, MemMonLargestFreeMB(), needMB);
     }
 
     if (!s) {                          // record (ring-evict oldest)
