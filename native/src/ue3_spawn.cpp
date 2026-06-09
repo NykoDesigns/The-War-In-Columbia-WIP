@@ -482,6 +482,8 @@ static volatile LONG g_GrowPos    = 0;
 static volatile LONG g_GrowWaves  = 0; // waves we grew
 static volatile LONG g_GrowAdded  = 0; // total extra enemies injected
 static volatile LONG g_DescDiffed = 0; // one-shot desc[0] vs desc[1] diff
+static volatile LONG g_LevelGrows  = 0; // grows since last level change (heartbeat)
+static volatile LONG g_PeakEnemies = 0; // max totalEnemies seen in single roster
 
 static void HexDumpToLog(const char* tag, const unsigned char* p, unsigned n);
 
@@ -1107,11 +1109,18 @@ static void ApplyRosterGrow(void* roster)
         }
         *reinterpret_cast<int*>(r + OFF_TARRAY_NUM) = want;
         InterlockedIncrement(&g_GrowWaves);
+        InterlockedIncrement(&g_LevelGrows);
         LONG tot = InterlockedAdd(&g_GrowAdded, add);
         // Tally actual enemy count: original descs keep their CountA, clones = 1.
         int totalEnemies = 0;
         for (int j = 0; j < want; ++j)
             totalEnemies += *reinterpret_cast<int*>((char*)data + (size_t)j * DESC_STRIDE + OFF_DESC_CountA);
+        // Track peak for heartbeat
+        LONG prev = g_PeakEnemies;
+        while (totalEnemies > prev) {
+            if (InterlockedCompareExchange(&g_PeakEnemies, totalEnemies, prev) == prev) break;
+            prev = g_PeakEnemies;
+        }
         SLog("ROSTER-GROW array=0x%p Num %d->%d (Max=%d, +%d descs, "
              "totalEnemies=%d, total-extra=%ld)",
              data, num, want, maxc, add, totalEnemies, tot);
@@ -1217,10 +1226,57 @@ static void*         g_HdrTrackArray = nullptr;
 static volatile LONG g_HdrDumps      = 0;
 static const int     HDR_DUMP_MAX     = 16;
 
+// ── Periodic heartbeat + level transition detection ──────────────────────
+static volatile LONG g_LastHeartbeat  = 0; // tick of last heartbeat log
+static volatile LONG g_LevelSpawns   = 0; // spawns since last level change
+static volatile LONG g_LevelCrashes  = 0; // crashes since last level change
+static DWORD         g_LevelStartTick = 0;
+
+// Detect level transition: when spawn sequence resets (gap > 30s with no
+// roster call) or this pointer changes dramatically, log a LEVEL-CHANGE.
+static void*         g_LastSpawner    = nullptr;
+
+static void LogHeartbeat()
+{
+    DWORD now = GetTickCount();
+    LONG last = InterlockedExchange(&g_LastHeartbeat, (LONG)now);
+    if (last && (now - (DWORD)last) < 60000) return; // only every 60s
+    SLog("HEARTBEAT: spawns=%ld grows=%ld extras=%ld crashes(VEH)=%ld "
+         "freeMB=%u peakEnemies=%ld | level: spawns=%ld grows=%ld",
+         g_SpawnSeq, g_GrowWaves, g_GrowAdded, g_LevelCrashes,
+         MemMonLargestFreeMB(), g_PeakEnemies,
+         g_LevelSpawns, g_LevelGrows);
+}
+
+static void DetectLevelChange(void* This)
+{
+    if (g_LastSpawner && This != g_LastSpawner) {
+        // Different spawner object — might be a new level or new encounter
+        // Only log as LEVEL-CHANGE if there's been a significant time gap
+        DWORD now = GetTickCount();
+        DWORD elapsed = now - g_LevelStartTick;
+        if (elapsed > 20000) { // >20s since last level start
+            SLog("LEVEL-CHANGE: new spawner=0x%p (was 0x%p) elapsed=%us | "
+                 "prev-level: spawns=%ld grows=%ld",
+                 This, g_LastSpawner, elapsed / 1000,
+                 g_LevelSpawns, g_LevelGrows);
+            g_LevelSpawns = 0;
+            g_LevelGrows = 0;
+            g_LevelStartTick = now;
+        }
+    } else if (!g_LevelStartTick) {
+        g_LevelStartTick = GetTickCount();
+    }
+    g_LastSpawner = This;
+}
+
 static void* __fastcall Hook_SpawnRoster(void* This, void* edx,
                                          void* roster, uint32_t flag,
                                          uint32_t a2)
 {
+    // Heartbeat + level detection
+    LogHeartbeat();
+    DetectLevelChange(This);
     // Cursor-hunt header dump (independent of the seq<=40 summary cap).
     if (g_HuntCursor && roster) {
         __try {
@@ -1247,13 +1303,17 @@ static void* __fastcall Hook_SpawnRoster(void* This, void* edx,
     // the first multi-enemy (count>1) wave we encounter (so we can confirm the
     // array stride / per-enemy fields before implementing duplication).
     LONG seq = InterlockedIncrement(&g_RosterSeq);
-    if (roster && seq <= 40) {
+    InterlockedIncrement(&g_LevelSpawns);
+    // Log EVERY roster call (no cap) so multi-level sessions are fully captured.
+    if (roster) {
         __try {
             void* array = *reinterpret_cast<void**>(roster);
             int   count = *reinterpret_cast<int*>((char*)roster + 4);
-            SLog("ROSTER #%ld: this=0x%p flag=%u a2=%u array=0x%p count=%d "
-                 "(largest-free=%u MB)",
-                 seq, This, flag, a2, array, count, MemMonLargestFreeMB());
+            int   maxc  = *reinterpret_cast<int*>((char*)roster + 8);
+            SLog("ROSTER #%ld: this=0x%p flag=%u a2=%u array=0x%p "
+                 "Num=%d Max=%d (freeMB=%u)",
+                 seq, This, flag, a2, array, count, maxc,
+                 MemMonLargestFreeMB());
 
             bool dumpMulti = (count > 1 &&
                               InterlockedCompareExchange(&g_MultiDumped, 1, 0) == 0);
@@ -1439,7 +1499,8 @@ static LONG CALLBACK CrashVEH(EXCEPTION_POINTERS* ep)
         code != EXCEPTION_DATATYPE_MISALIGNMENT &&
         code != 0xC0000409 /* fast-fail / stack-buffer overrun */)
         return EXCEPTION_CONTINUE_SEARCH;
-    if (InterlockedIncrement(&g_CrashLogged) > 6) return EXCEPTION_CONTINUE_SEARCH;
+    InterlockedIncrement(&g_LevelCrashes);
+    if (InterlockedIncrement(&g_CrashLogged) > 30) return EXCEPTION_CONTINUE_SEARCH;
 
     __try {
         void* fault = ep->ExceptionRecord->ExceptionAddress;
@@ -1966,9 +2027,17 @@ void InitSpawnHook()
 void ShutdownSpawnHook()
 {
     if (g_Log) {
-        SLog("Shutdown. Spawns observed: %ld | create-AI calls: %ld | "
-             "waves grown: %ld | EXTRA enemies injected: %ld",
-             g_SpawnSeq, g_CreateSeq, g_GrowWaves, g_GrowAdded);
+        DWORD elapsed = GetTickCount() - g_StartTick;
+        SLog("=== SESSION END (elapsed %u:%02u) ===", elapsed / 60000, (elapsed / 1000) % 60);
+        SLog("  Spawns: %ld | Roster calls: %ld | Waves grown: %ld | "
+             "Extra enemies: %ld | Peak enemies/roster: %ld",
+             g_SpawnSeq, g_RosterSeq, g_GrowWaves, g_GrowAdded, g_PeakEnemies);
+        SLog("  Crashes(VEH): %ld | Memcpy guards: %ld | "
+             "create-AI: %ld | Pool grows: %ld",
+             g_CrashLogged, g_MemcpyGuards, g_CreateSeq, g_AudioPoolsGrown);
+        SLog("  Config: GrowRoster=%s x%d | MaxWave=%d | DoubleAI=%s | freeMB=%u",
+             g_GrowRoster ? "ON" : "OFF", g_RosterMult, g_MaxWaveTotal,
+             g_DoubleAI ? "ON" : "OFF", MemMonLargestFreeMB());
         fclose(g_Log);
         g_Log = nullptr;
     }
