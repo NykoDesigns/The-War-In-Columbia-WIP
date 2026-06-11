@@ -84,6 +84,12 @@ The mod modifies BioShock Infinite by:
 - **Weapon properties** — Fire rate, magazine size, spread adjustments
 - **Ammo capacity** — Max carry amounts per ammo type
 
+### Weapon Carry Limit (Implementation Ready)
+- **Goal** — Increase from 2 weapons to 4 via mouse wheel cycling
+- **Discovery** — The game already stores ALL weapons in a 36-slot array; the 2-weapon limit is purely in the cycling logic (`NextWeapon` only toggles between 2 indices)
+- **Approach** — Override `NextWeapon` to cycle through 4 populated weapon slots instead of toggling between 2
+- **Status** — Full structure mapped, `SetEquippedWeaponIndex` identified; implementing 4-weapon cycle
+
 ### Enemy Health (Static)
 - **Health tuning** — Per-enemy-type health multipliers
 - **Enemy types** — Soldiers, Automatons (Patriots, Mosquitoes, Turrets), Handymen, Sirens, Firemen, Crows

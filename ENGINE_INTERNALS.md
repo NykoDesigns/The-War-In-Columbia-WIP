@@ -288,7 +288,73 @@ The high-totalEnemies waves (31, 41, 24) caused **zombie spawns**:
 | PhysX constraint | 1 | 21 | CountA=1 |
 | Module WRITE (stream buf) | 1 | 21 | JLE→JBE patch |
 
-## 12. Function Database
+## 12. Weapon Inventory System (Reverse-Engineered — COMPLETE)
+
+### Architecture
+- **XPlayerController** holds Pawn at offset +0x1FC
+- **XInventoryManager** is a separate UObject; InvMgr+0xA0 = Pawn pointer
+- Weapons stored in a **fixed 36-slot array** at InvMgr+0x1FC (indexed by weapon type ID)
+- `EquippedWeaponIndex` (+0x2A0) and `BackupWeaponIndex` (+0x2A4) select active/backup
+- **The 2-weapon limit is purely in the cycling logic** — the array keeps all owned weapons!
+- Mouse wheel fires `NextWeapon` which only toggles between Equipped and Backup indices
+- Burial at Sea DLC already has carry-all + weapon wheel using `CycleWeaponUp/Down`
+
+### XInventoryManager Memory Layout (CONFIRMED)
+```
++0x0A0: UObject* Pawn (owner)
++0x1FC: UObject* Weapons[36] — weapon object pointers indexed by type ID
+         Slot[i] non-NULL = player owns weapon type i
+         Observed: slots 0-8 populated (9 weapons), 9-35 = NULL
+         Slots 0-3 = melee/vigors, Slots 4+ = standard guns
++0x28C: int PreviousEquippedIndex (-1 = none)
++0x290: int Previous of +0x2A8
++0x294: int Previous BackupWeaponIndex
++0x298: int Previous of +0x2AC
++0x29C: DWORD ChangeFlags
++0x2A0: int EquippedWeaponIndex (active weapon type, 0-35)
++0x2A4: int BackupWeaponIndex (secondary weapon type, 0-35)
++0x2A8: int AdditionalIndex (used in backup management)
++0x2AC: int AdditionalIndex (used in backup management)
+```
+
+### Key Insight: The 2-Weapon Limit
+The game already stores ALL weapons the player picks up in the 36-slot array.
+Nothing is ever removed during swaps. The limit is enforced only by:
+- `NextWeapon` toggling between EquippedWeaponIndex and BackupWeaponIndex
+- The HUD only showing 2 weapon slots
+
+### Disassembled Functions
+| Function | RVA | Signature | Purpose |
+|----------|-----|-----------|---------|
+| SetEquippedWeaponIndex | 0x531F00 | thiscall(InvMgr, int index) | Equips weapon at Weapons[index] |
+| SetBackupWeaponIndex | 0x531FB0 | thiscall(InvMgr, int index) | Sets backup weapon |
+| NextWeapon (exec) | 0x5090F0 | exec stub | Toggles equipped ↔ backup |
+| ClientSetEquippedWeaponIndex (exec) | 0x509450 | exec stub | Network-safe wrapper |
+| ClientSetBackupWeaponIndex (exec) | 0x5093F0 | exec stub | Network-safe wrapper |
+| CycleWeaponUp/Down (exec) | 0x50AA20/60 | exec stub | DLC multi-weapon cycling |
+
+### SetEquippedWeaponIndex Logic (0x531F00)
+```
+1. if (current == newIndex) return;
+2. oldWeapon = Weapons[current]  // [this + current*4 + 0x1FC]
+3. if (oldWeapon && current != BackupWeaponIndex)
+      vtable[0xB4](oldWeapon)  // UnEquipWeapon
+4. this->EquippedWeaponIndex = newIndex  // [this+0x2A0]
+5. newWeapon = Weapons[newIndex]  // [this + newIndex*4 + 0x1FC]
+6. if (newWeapon) EquipWeapon(newWeapon, true)
+```
+
+### Weapon Pickup Flow (Hold F)
+1. `execXSwapWeaponWithUseTarget` (RVA 0x4FCE30) — async, starts animation
+2. After animation completes: EquippedWeaponIndex changes
+3. Old weapon stays in its array slot — never removed
+
+### 4-Weapon Cycling Implementation
+- Hook `NextWeapon` to scan Weapons[4..35] for non-NULL entries
+- Cycle forward through populated gun slots (skip vigors at 0-3)
+- Call `SetEquippedWeaponIndex(nextSlot)` directly at RVA 0x531F00
+
+## 13. Function Database
 
 Total functions decompiled: **23**
 

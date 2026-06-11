@@ -1961,6 +1961,161 @@ void InitSpawnHook()
     // No function hook needed — binary patch is sufficient and avoids overhead
     // on this extremely hot-path function (called millions of times during load).
 
+    // ── Weapon carry limit: diagnostic hooks (phase 3) ────────────────────────
+    // Phase 1-2 findings: AtCapacity is NPC-only. EquipWeapon/AddInventory/DropWeapon/
+    // BeginWeaponSwap/OnAddRemoveSwapWeapons do NOT fire during hold-F weapon pickup.
+    // The actual pickup path must go through XSwapWeaponWithUseTarget.
+    {
+        typedef void (__fastcall* fn_Exec)(void* This, void* edx, void* Stack, void* Result);
+
+        #define DECL_HOOK(NAME, RVA_VAL) \
+            static const unsigned RVA_##NAME = RVA_VAL; \
+            static fn_Exec Real_##NAME = nullptr; \
+            struct H_##NAME { \
+                static void __fastcall Hook(void* T, void* e, void* S, void* R) { \
+                    SLog("WPN: " #NAME " (this=%p)", T); \
+                    Real_##NAME(T, e, S, R); \
+                } \
+            };
+
+        // ── WEAPON CARRY LIMIT: 4-weapon cycling via NextWeapon override ──
+        // XInventoryManager layout:
+        //   +0x1FC: Weapons[36] (UObject* array, indexed by weapon type 0-35)
+        //   +0x2A0: EquippedWeaponIndex (int, current active weapon type)
+        //   +0x2A4: BackupWeaponIndex (int, secondary weapon type)
+        // SetEquippedWeaponIndex at RVA 0x531F00: thiscall(InvMgr, int newIndex)
+        static const unsigned RVA_SwapWithUse = 0x4FCE30;
+        static fn_Exec Real_SwapWithUse = nullptr;
+        static void* s_InvMgr = nullptr; // captured from AddInventory/NextWeapon
+
+        // ── 4-WEAPON CYCLING IMPLEMENTATION ──
+        // Configuration: how many gun slots to cycle through (4 = user's request)
+        static const int MAX_CYCLE_WEAPONS = 4;
+        // XWeapon vtable RVA — ONLY weapons with this exact vtable are guns
+        // Vigors (XWeaponMurderOfCrows=0xDDBB60) and melee (XWeaponDedicatedMelee=0xDDA758) are excluded
+        static const unsigned VTBL_RVA_XWEAPON = 0xDD9DE0;
+
+        struct H_SwapWithUse {
+            static void __fastcall Hook(void* T, void* e, void* S, void* R) {
+                if (!s_InvMgr) {
+                    // Try to capture from PlayerController path as fallback
+                }
+                Real_SwapWithUse(T, e, S, R);
+            }
+        };
+        // AddInventory hook to capture InvMgr early at startup
+        static const unsigned RVA_AddInventory = 0x509340;
+        static fn_Exec Real_AddInventory = nullptr;
+        struct H_AddInventory {
+            static void __fastcall Hook(void* T, void* e, void* S, void* R) {
+                if (!s_InvMgr) {
+                    s_InvMgr = T;
+                    SLog("WPN: Captured InvMgr from AddInventory = %p", T);
+                }
+                Real_AddInventory(T, e, S, R);
+            }
+        };
+        DECL_HOOK(UseAnyObject,    0x4FCB30)  // XPlayerController::execXUseAnyObject
+        DECL_HOOK(UseObject,       0x4FCBF0)  // XPlayerController::execXUseObjectThatIsNotUnsubstantiated
+        DECL_HOOK(SetWeapon,       0x4F9ED0)  // XPawn::execSetWeapon / XDLCCPawn::execSetWeapon
+        DECL_HOOK(UnSetWeapon,     0x4F9F10)  // XPawn::execUnSetWeapon
+        DECL_HOOK(AcquireWeapon,   0x4F9FF0)  // XPawn::execAcquireWeapon
+        DECL_HOOK(GivenTo,         0x500B70)  // XWeapon::execGivenTo
+        DECL_HOOK(StartGivenTo,    0x501660)  // XWeapon::execStartGivenTo
+        DECL_HOOK(StartRemoved,    0x5016E0)  // XWeapon::execStartRemovedFrom
+        DECL_HOOK(TryToEquip,      0x501530)  // XWeapon::execTryToEquip
+        DECL_HOOK(OnEquipWeapon,   0x4FAAF0)  // XPawn::execOnEquipWeapon
+        DECL_HOOK(CycleUp,         0x50AA20)  // XDLCCPlayerController::execCycleWeaponUp
+        DECL_HOOK(CycleDown,       0x50AA60)  // XDLCCPlayerController::execCycleWeaponDown
+        DECL_HOOK(DropPlayers,     0x4FA090)  // XPawn::execDropWeapon_PlayersOnly
+        // NextWeapon — OVERRIDDEN for 4-weapon cycling
+        // Strategy: pre-set BackupWeaponIndex to our target, then let Real_NextWeapon
+        // toggle naturally. This uses the game's normal equip path (proper model/animation).
+        static const unsigned RVA_NextWeapon = 0x5090F0;
+        static fn_Exec Real_NextWeapon = nullptr;
+        struct H_NextWeapon {
+            static void __fastcall Hook(void* T, void* e, void* S, void* R) {
+                if (!s_InvMgr) {
+                    s_InvMgr = T;
+                    SLog("WPN: Captured InvMgr = %p", T);
+                }
+
+                BYTE* inv = (BYTE*)s_InvMgr;
+                DWORD* weapons = (DWORD*)(inv + 0x1FC); // Weapons[36] array
+                int currentIdx = *(int*)(inv + 0x2A0);  // EquippedWeaponIndex
+                DWORD xWeaponVtbl = g_Base + VTBL_RVA_XWEAPON; // runtime vtable address
+
+                // Build list of populated GUN slots (filter by XWeapon vtable, skip vigors/melee)
+                int gunSlots[36];
+                int numGuns = 0;
+                for (int i = 0; i < 36; i++) {
+                    if (weapons[i] != 0 && !IsBadReadPtr((void*)weapons[i], 4)) {
+                        DWORD vtbl = *(DWORD*)weapons[i];
+                        if (vtbl == xWeaponVtbl) {
+                            gunSlots[numGuns++] = i;
+                            if (numGuns >= MAX_CYCLE_WEAPONS) break;
+                        }
+                    }
+                }
+
+                if (numGuns <= 1) {
+                    // Only 0 or 1 gun — let original behavior handle it
+                    Real_NextWeapon(T, e, S, R);
+                    return;
+                }
+
+                // Find current position in our cycle list
+                int curPos = -1;
+                for (int i = 0; i < numGuns; i++) {
+                    if (gunSlots[i] == currentIdx) { curPos = i; break; }
+                }
+
+                // Advance to next slot (wrap around)
+                int nextPos = (curPos + 1) % numGuns;
+                int nextIdx = gunSlots[nextPos];
+
+                SLog("WPN: Cycle %d -> %d (slot %d/%d)", currentIdx, nextIdx, nextPos+1, numGuns);
+
+                // Pre-set BackupWeaponIndex to our desired target
+                // When Real_NextWeapon toggles equipped <-> backup, it will land on nextIdx
+                *(int*)(inv + 0x2A4) = nextIdx;
+
+                // Let the game's normal NextWeapon handle the switch (proper model/anim/sound)
+                Real_NextWeapon(T, e, S, R);
+            }
+        };
+
+        #undef DECL_HOOK
+
+        struct { unsigned rva; void* hook; void** real; const char* name; } hooks[] = {
+            { RVA_SwapWithUse,   (void*)&H_SwapWithUse::Hook,   (void**)&Real_SwapWithUse,   "XSwapWeaponWithUseTarget" },
+            { RVA_UseAnyObject,  (void*)&H_UseAnyObject::Hook,  (void**)&Real_UseAnyObject,  "XUseAnyObject" },
+            { RVA_UseObject,     (void*)&H_UseObject::Hook,     (void**)&Real_UseObject,     "XUseObject" },
+            { RVA_SetWeapon,     (void*)&H_SetWeapon::Hook,     (void**)&Real_SetWeapon,     "SetWeapon" },
+            { RVA_UnSetWeapon,   (void*)&H_UnSetWeapon::Hook,   (void**)&Real_UnSetWeapon,   "UnSetWeapon" },
+            { RVA_AddInventory,  (void*)&H_AddInventory::Hook,  (void**)&Real_AddInventory,  "AddInventory" },
+            { RVA_AcquireWeapon, (void*)&H_AcquireWeapon::Hook, (void**)&Real_AcquireWeapon, "AcquireWeapon" },
+            { RVA_GivenTo,       (void*)&H_GivenTo::Hook,       (void**)&Real_GivenTo,       "GivenTo" },
+            { RVA_StartGivenTo,  (void*)&H_StartGivenTo::Hook,  (void**)&Real_StartGivenTo,  "StartGivenTo" },
+            { RVA_StartRemoved,  (void*)&H_StartRemoved::Hook,  (void**)&Real_StartRemoved,  "StartRemovedFrom" },
+            { RVA_TryToEquip,    (void*)&H_TryToEquip::Hook,    (void**)&Real_TryToEquip,    "TryToEquip" },
+            { RVA_OnEquipWeapon, (void*)&H_OnEquipWeapon::Hook, (void**)&Real_OnEquipWeapon, "OnEquipWeapon" },
+            { RVA_CycleUp,       (void*)&H_CycleUp::Hook,       (void**)&Real_CycleUp,       "CycleWeaponUp" },
+            { RVA_CycleDown,     (void*)&H_CycleDown::Hook,     (void**)&Real_CycleDown,     "CycleWeaponDown" },
+            { RVA_DropPlayers,   (void*)&H_DropPlayers::Hook,   (void**)&Real_DropPlayers,   "DropWeapon_PlayersOnly" },
+            { RVA_NextWeapon,    (void*)&H_NextWeapon::Hook,    (void**)&Real_NextWeapon,    "NextWeapon" },
+        };
+        for (auto& h : hooks) {
+            void* target = reinterpret_cast<void*>(g_Base + h.rva);
+            if (MH_CreateHook(target, h.hook, h.real) == MH_OK &&
+                MH_EnableHook(target) == MH_OK) {
+                SLog("WPN: %s hook OK @ base+0x%X", h.name, h.rva);
+            } else {
+                SLog("WPN: %s hook FAILED @ base+0x%X", h.name, h.rva);
+            }
+        }
+    }
+
     // ── Streaming-serialize guard (out-of-combat ~1GB memcpy crash) ──
     void* pArSerialize = reinterpret_cast<void*>(g_Base + RVA_ArSerialize);
     if (MH_CreateHook(pArSerialize, (void*)&Hook_ArSerialize,
