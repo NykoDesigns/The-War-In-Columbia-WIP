@@ -1,0 +1,85 @@
+// ============================================
+// Class: XWeaponReturnToSender
+// Object: Plasmid_ReturnToSenderInsta
+// Outer: PreCoalescedItemAssets
+// SerialSize: 2212
+// SerialOffset: 0x34B1B43
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponReturnToSender'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta'
+// Archetype: XWeaponReturnToSender'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase'
+begin object name="Plasmid_ReturnToSenderInsta"
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefEnergyBurnRateVsTime'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DefEnergyBurnRateVsTime'
+	begin object name="DefEnergyBurnRateVsTime"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=1.9990000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=2.0000000,OutVal=10.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=3.0000000,OutVal=10.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DistributionFloatConstantCurve_9971'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DistributionFloatConstantCurve_9973'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	ShieldArchetype=XReturnToSenderShield'Arc_XReturnToSender.Created.Plasmid_ReturnToSenderInsta_Shield'
+	EnergyBurnRateVsTime=/* ERROR: System.ArgumentOutOfRangeException */
+	ReturnToSenderMinShieldAbsorbDamageForTrapAttrib=(BaseValue=0.0000000)
+	FireMode[0]=(StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,DamageType=XDamageType'Arc_XReturnToSender.DamageTypes.Plasmid_ReturnToSenderCharge_Damage',BeginFireTime=0.5000000,EndFireTime=0.6660000,WeaponCooldownTimeAttrib=(BaseValue=1.0000000),ShotCostAttrib=(BaseValue=20.0000000),MinAmmoForAttack=20,ProjectileArchetype=XReturnToSenderProxyGrenade'Arc_XReturnToSender.Projectiles.Plasmid_ReturnToSenderInstaShield_DropProjectile')
+	FireMode[1]=(StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,DamageType=XDamageType'Arc_XReturnToSender.DamageTypes.Plasmid_ReturnToSenderCharge_Damage',BeginFireTime=0.5000000,FireTimeAttrib=(BaseValue=1.0000000),WeaponCooldownTimeAttrib=(BaseValue=1.0000000),ProjectileArchetype=XReturnToSenderProxyGrenade'Arc_XReturnToSender.Projectiles.Plasmid_ReturnToSenderInstaShield_Projectile')
+	MaxAmmoCountAttrib=(BaseValue=6.0000000)
+	FireOffset=(X=160.0000000,Y=-50.0000000,Z=-4.0000000)
+	CrouchedFireOffset=(X=160.0000000,Y=-50.0000000,Z=-4.0000000)
+	MagicBulletBendAngleVsDistance=/* ERROR: System.IO.EndOfStreamException */
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefZoomedMagicBulletBendAngleVsDistance')
+	TBarMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefTBarMagicBulletBendAngleVsDistance',LookupTable=/* Array type was not detected. */,0=/* ERROR: System.Exception */,FloatProperty[5531]=0.0000000,TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefTBarZoomedMagicBulletBendAngleVsDistance'),ShockedSpreadIncrease=0.0000000,WeaponUnlockItemLookupID=530,MinDesiredPickupAmount=40,MaxDesiredPickupAmount=40,AtlassedSmallIcon=(AtlasTexture=Texture2D'VigorIcons.Atlas_Vigor_Icons',Left=448,Width=64,Height=64),AtlassedLargeIcon=(AtlasTexture=Texture2D'VigorIcons_128.Atlas_VigorIcons128',Left=512,Width=128,Height=128))
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_ReturnToSenderInsta.DefTBarZoomedMagicBulletBendAngleVsDistance')
+	ShockedSpreadIncrease=0.0000000
+	WeaponUnlockItemLookupID=530
+	MinDesiredPickupAmount=40
+	MaxDesiredPickupAmount=40
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'VigorIcons.Atlas_Vigor_Icons',Left=448,Width=64,Height=64)
+	AtlassedLargeIcon=(AtlasTexture=Texture2D'VigorIcons_128.Atlas_VigorIcons128',Left=512,Width=128,Height=128)
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

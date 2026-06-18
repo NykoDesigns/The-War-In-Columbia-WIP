@@ -1,0 +1,70 @@
+// Class: XWeaponReturnToSender
+// Object: DLCC_Plasmid_ReturnToSender
+// Size: 2868
+
+// Reference: XWeaponReturnToSender'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender'
+begin object name="DLCC_Plasmid_ReturnToSender" class=XCore.XWeaponReturnToSender
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefEnergyBurnRateVsTime'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefEnergyBurnRateVsTime'
+	begin object name="DefEnergyBurnRateVsTime"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=1.9990000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=2.0000000,OutVal=10.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=3.0000000,OutVal=10.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefMagicBulletBendAngleVsDistance'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	ShieldArchetype=XDLCCReturnToSenderShield'DLCC_Arc_XReturnToSender.Created.DLCC_Plasmid_ReturnToSenderInsta_Shield'
+	EnergyBurnRateVsTime=/* ERROR: System.ArgumentOutOfRangeException */
+	ReturnToSenderTapShieldDuration=(BaseValue=2.0000000)
+	ReturnToSenderShouldAbsorbAmmoAttrib=(BaseValue=1.0000000)
+	ReturnToSenderMinShieldAbsorbDamageForTrapAttrib=(BaseValue=0.0000000)
+	FireMode[0]=/* ERROR: System.IO.EndOfStreamException */
+	FireMode[1]=(WeaponFireType=EWeaponFireType.EWFT_None,StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,DamageType=XDamageType'Arc_XReturnToSender.DamageTypes.Plasmid_ReturnToSenderCharge_Damage',BeginFireTime=0.5000000,FireTimeAttrib=(BaseValue=1.0000000),EndFireTime=0.3000000,WeaponCooldownTimeAttrib=(BaseValue=1.0000000),UpgradedProjectileArchetypes=/* ERROR: System.Exception */,ProjectileArchetype=XReturnToSenderProxyGrenade'Arc_XReturnToSender.Projectiles.Plasmid_ReturnToSenderInstaShield_Upgrade_Projectile',RequiredUpgrades=/* ERROR: System.Exception */,DTC_UpgradeOne=/* ERROR: System.Exception */,RoundsPerAmmoBunch=3,MaxAmmoCountAttrib=(BaseValue=6.0000000),FireOffset=(X=160.0000000,Y=-50.0000000,Z=-4.0000000),CrouchedFireOffset=(X=160.0000000,Y=-50.0000000,Z=-4.0000000),MagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefMagicBulletBendAngleVsDistance'),ZoomedMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefZoomedMagicBulletBendAngleVsDistance'),TBarMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefTBarMagicBulletBendAngleVsDistance'),TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefTBarZoomedMagicBulletBendAngleVsDistance'),AimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default',FiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default',TBarAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default',TBarFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default',TBarZoomedAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default',TBarZoomedFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default',WeaponSpreadDefault=(MaxSpread=0.0000000),ShockedSpreadIncrease=0.0000000,FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'DLCC_PreCoalescedItemAssets.Models_FirstPerson.DLCC_Plasmid_ReturnToSender_FPModel',ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XReturnToSender.Models_ThirdPerson.Plasmid_ReturnToSenderCharge_TPModel',WeaponUnlockItemLookupID=1169,WeaponConsumableItemLookupID=1208,MinDesiredPickupAmount=40,MaxDesiredPickupAmount=40,BloomingCrosshairFrameName="ReturnToSender",AtlassedSmallIcon=(AtlasTexture=Texture2D'DLCC_Icons_64.Atlas_DLCC_Icons_64',Width=64,Height=64),AtlassedLargeIcon=(AtlasTexture=Texture2D'DLCC_Icons_128.Atlas_DLCC_Icons_128',Left=256,Width=128,Height=128))
+	RoundsPerAmmoBunch=3
+	MaxAmmoCountAttrib=(BaseValue=6.0000000)
+	FireOffset=(X=160.0000000,Y=-50.0000000,Z=-4.0000000)
+	CrouchedFireOffset=(X=160.0000000,Y=-50.0000000,Z=-4.0000000)
+	MagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefMagicBulletBendAngleVsDistance')
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefZoomedMagicBulletBendAngleVsDistance')
+	TBarMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefTBarMagicBulletBendAngleVsDistance')
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_ReturnToSender.DefTBarZoomedMagicBulletBendAngleVsDistance')
+	AimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	FiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarZoomedAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarZoomedFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	WeaponSpreadDefault=(MaxSpread=0.0000000)
+	ShockedSpreadIncrease=0.0000000
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'DLCC_PreCoalescedItemAssets.Models_FirstPerson.DLCC_Plasmid_ReturnToSender_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XReturnToSender.Models_ThirdPerson.Plasmid_ReturnToSenderCharge_TPModel'
+	WeaponUnlockItemLookupID=1169
+	WeaponConsumableItemLookupID=1208
+	MinDesiredPickupAmount=40
+	MaxDesiredPickupAmount=40
+	BloomingCrosshairFrameName="ReturnToSender"
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'DLCC_Icons_64.Atlas_DLCC_Icons_64',Width=64,Height=64)
+	AtlassedLargeIcon=(AtlasTexture=Texture2D'DLCC_Icons_128.Atlas_DLCC_Icons_128',Left=256,Width=128,Height=128)
+end object

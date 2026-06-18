@@ -1,0 +1,23 @@
+// ============================================
+// Class: XDLCBDamageType
+// Object: Plasmid_WinterBolt_TapDamage
+// Outer: Models_FirstPerson
+// SerialSize: 2637
+// SerialOffset: 0x325AC80
+// ============================================
+
+// === Decompiled ===
+// Reference: XDLCBDamageType'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapDamage'
+begin object name="Plasmid_WinterBolt_TapDamage" class=XCore.XDLCBDamageType
+	PhysicsChangeOnSkylinesAndBollards=EPhysicsWhenKickedOffSkyline.PCSB_Falling
+	DamageStimuli=/* Array type was not detected. */
+	Modifiers=/* Array type was not detected. */
+	SecondaryDamages=/* Array type was not detected. */
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

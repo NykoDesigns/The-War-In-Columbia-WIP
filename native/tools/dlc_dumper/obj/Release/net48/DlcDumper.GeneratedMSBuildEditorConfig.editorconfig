@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = DlcDumper
+build_property.ProjectDir = Z:\TheWarInColumbia\native\tools\dlc_dumper\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 

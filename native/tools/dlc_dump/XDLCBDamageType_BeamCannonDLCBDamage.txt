@@ -1,0 +1,52 @@
+// ============================================
+// Class: XDLCBDamageType
+// Object: BeamCannonDLCBDamage
+// Outer: DLCB_PreCoalescedItemAssets
+// SerialSize: 2867
+// SerialOffset: 0x325B6CD
+// ============================================
+
+// === Decompiled ===
+// Reference: XDLCBDamageType'DLCB_PreCoalescedItemAssets.BeamCannonDLCBDamage'
+begin object name="BeamCannonDLCBDamage" class=XCore.XDLCBDamageType
+	CanMicrowavedMovementAdjustmentBeApplied=DamageTypeCondition.DTC_UpgradeOne
+	// Reference: XEffectSpeech'DLCB_PreCoalescedItemAssets.BeamCannonDLCBDamage.XEffectSpeech'
+	begin object name="XEffectSpeech" class=XCore.XEffectSpeech
+		// Reference: XAKAudioArgumentID'DLCB_PreCoalescedItemAssets.BeamCannonDLCBDamage.XEffectSpeech.ArgID'
+		// Archetype: XAKAudioArgumentID'XCore.Default__XEffectSpeech.ArgID'
+		begin object name="ArgID"
+		end object
+		SpeechContext=ArgID
+		SpeechStateToPlay="Damaged"
+		MPSpeechStateToPlay="Damaged"
+		CachedIsSafeForAsyncPlay=true
+	end object
+	DamageVO=XEffectSpeech
+	DamageAnimFlags=/* ERROR: System.ArgumentOutOfRangeException */
+	bRequiresHUDFeedbackOnSuccessfulHit=true
+	LocationDamageModifiers=(LocationModifiers=(Modifier=1.5000000),LocationModifiers[6]=(Modifier=1.5000000),LocationModifiers[7]=(Modifier=1.5000000))
+	RollingThunderLinearVelocity=0.0000000
+	RollingThunderAngularVelocity=0.0000000
+	KDamageImpulse=150.0000000
+	KDeathVel=500.0000000
+	Effects=/* Array type was not detected. */
+	MaxDistanceToTriggerBulletPassbyEffects=3000.0000000
+	DamageStimuli=/* Array type was not detected. */
+	Modifiers=/* Array type was not detected. */
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

@@ -1,0 +1,35 @@
+// ============================================
+// Class: XDamageType
+// Object: WinterBolt_HoldGrenade_Damage
+// Outer: DamageTypes
+// SerialSize: 2538
+// SerialOffset: 0x32346AD
+// ============================================
+
+// === Decompiled ===
+// Reference: XDamageType'DLCB_Arc_XWinterBolt.DamageTypes.WinterBolt_HoldGrenade_Damage'
+begin object name="WinterBolt_HoldGrenade_Damage" class=XCore.XDamageType
+	bIsVigorTrapDamage=true
+	KDamageImpulse=4000.0000000
+	KDeathVel=4000.0000000
+	KDeathUpKick=2000.0000000
+	KImpulseRadius=1200.0000000
+	KRadialDamageImpulseZDelta=-100.0000000
+	RadialDamageImpulse=4000.0000000
+	DamageStimuli=/* Array type was not detected. */
+	Modifiers=/* Array type was not detected. */
+	SecondaryDamages=/* Array type was not detected. */
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

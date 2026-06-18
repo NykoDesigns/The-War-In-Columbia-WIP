@@ -1,0 +1,93 @@
+// ============================================
+// Class: XWeaponCharge
+// Object: Plasmid_Charge
+// Outer: PreCoalescedItemAssets
+// SerialSize: 3592
+// SerialOffset: 0x34F72D
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponCharge'PreCoalescedItemAssets.Plasmid_Charge'
+begin object name="Plasmid_Charge" class=XCore.XWeaponCharge
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_Charge.DefaultMaxChargeDistanceVsAngle'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponCharge.DefaultMaxChargeDistanceVsAngle'
+	begin object name="DefaultMaxChargeDistanceVsAngle"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_Charge.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponCharge.DefMagicBulletBendAngleVsDistance'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_Charge.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponCharge.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_Charge.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponCharge.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_Charge.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponCharge.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	BoostLevelList=/* Array type was not detected. */
+	PreChargeDelayTime=0.3000000
+	MaxChargeDistanceVsAngle=(Distribution=Distribution=DefaultMaxChargeDistanceVsAngle)
+	PreChargeEffect=(VisualEffect=XEffectMultiple'Arc_ChargeVisualFX.Storm.Charge_Storm_ANTIC_FX',AudioEffect=XEffectSound'Arc_Charge_SFX.FireEffect')
+	ChargeFizzledEffect=(AudioEffect=XEffectSound'Arc_Charge_SFX.DryFireEffect')
+	ValidChargeTargetStateEffect=(VisualEffect=XEffectMultiple'Arc_ChargeVisualFX.Charge_ValidChargeFX_Target')
+	ChargeDevilsKissComboProjectileParams=(ProjectileArchetype=XProjectile'Arc_XPlasmidIncinerate.Projectiles.DevilsKiss_TapGrenadeClusterSubMunition_Projectile',DamageType=XDamageType'Arc_XPlasmidIncinerate.DamageTypes.DevilsKiss_TapGrenadeClusterSubMunition_Damage',StimulusType=EFireModeStimulusType.FMST_GrenadeStimulus,NumProjectilesToSpawn=(Value1=5,Value2=5),DistanceToSpawnOffset=(Value1=150.0000000,Value2=150.0000000),ProjectileSpeed=(Value1=500.0000000,Value2=1000.0000000))
+	ChargeDKComboBonusDamage=XDamageType'Arc_XCharge.ChargeDKBonusDamage'
+	BuckingBroncoBonusDamage=XDamageType'Arc_XCharge.ChargeBuckingBroncoBonusDamage'
+	FireMode[0]=(WeaponFireType=EWeaponFireType.EWFT_Custom,StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,FireModeStimulusType=EFireModeStimulusType.FMST_HomingStimulus,DamageType=XDamageType'Arc_XCharge.ChargeDamage',bChanneledFire=true,bIsSingleShot=true,BeginFireTime=0.3000000,FireTimeAttrib=(BaseValue=1.5000000),WeaponCooldownTimeAttrib=(BaseValue=1.0000000),ShotCostAttrib=(BaseValue=25.0000000),MinAmmoForAttack=25)
+	FireMode[1]=(ShotCostAttrib=(BaseValue=25.0000000),MinAmmoForAttack=25)
+	WeaponDamageCategories=/* Array type was not detected. */
+	MagicBulletBendAngleVsDistance=(Distribution=Distribution=DefMagicBulletBendAngleVsDistance)
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefZoomedMagicBulletBendAngleVsDistance)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarMagicBulletBendAngleVsDistance)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarZoomedMagicBulletBendAngleVsDistance)
+	ShockedSpreadIncrease=0.0000000
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'Arc_XCharge.Models_FirstPerson.Plasmid_Charge_FPModel'
+	WeaponUnlockItemLookupID=2
+	WeaponConsumableItemLookupID=543
+	MinDesiredPickupAmount=25
+	MaxDesiredPickupAmount=25
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'VigorIcons.Atlas_Vigor_Icons',Left=128,Width=64,Height=64)
+	AtlassedLargeIcon=(AtlasTexture=Texture2D'VigorIcons_128.Atlas_VigorIcons128',Width=128,Height=128)
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

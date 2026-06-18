@@ -1,0 +1,15 @@
+Z:\TheWarInColumbia\native\tools\dlc_dumper\bin\Release\net48\DlcDumper.exe.config
+Z:\TheWarInColumbia\native\tools\dlc_dumper\bin\Release\net48\DlcDumper.exe
+Z:\TheWarInColumbia\native\tools\dlc_dumper\bin\Release\net48\DlcDumper.pdb
+Z:\TheWarInColumbia\native\tools\dlc_dumper\bin\Release\net48\Eliot.UELib.dll
+Z:\TheWarInColumbia\native\tools\dlc_dumper\bin\Release\net48\Eliot.Utilities.dll
+Z:\TheWarInColumbia\native\tools\dlc_dumper\bin\Release\net48\System.Runtime.CompilerServices.Unsafe.dll
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.csproj.AssemblyReference.cache
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.GeneratedMSBuildEditorConfig.editorconfig
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.AssemblyInfoInputs.cache
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.AssemblyInfo.cs
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.csproj.CoreCompileInputs.cache
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.sourcelink.json
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.csproj.Up2Date
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.exe
+Z:\TheWarInColumbia\native\tools\dlc_dumper\obj\Release\net48\DlcDumper.pdb

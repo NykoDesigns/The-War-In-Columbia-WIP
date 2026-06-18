@@ -603,6 +603,13 @@ descriptors in a roster; same-level-package → no use-after-free).
 | RVA | Symbol | Notes |
 |-----|--------|-------|
 | 0x22CA80 | SpawnActor | UWorld::SpawnActor |
+| 0x531F00 | SetEquippedWeaponIndex | thiscall(InvMgr, int) — equips weapon |
+| 0x531FB0 | SetBackupWeaponIndex | thiscall(InvMgr, int) — sets backup weapon |
+| 0x5090F0 | NextWeapon (exec) | Toggles equipped ↔ backup |
+| 0x50A8E0 | XStartWeaponRadialMenu | DLC2 weapon wheel open |
+| 0x50A920 | XStopWeaponRadialMenu | DLC2 weapon wheel close |
+| 0x4FD1B0 | XStartVigorRadialMenu | Vigor wheel open |
+| 0x4FD1F0 | XStopVigorRadialMenu | Vigor wheel close |
 | 0x651BE0 | CreateAI | Create XAIController + possess pooled pawn |
 | 0x657B40 | SpawnOneAI | Per-descriptor spawn (idempotent, no doubling) |
 | 0x658870 | SpawnRoster | Roster-based wave spawner (iterates TArray) |
@@ -614,6 +621,12 @@ descriptors in a roster; same-level-package → no use-after-free).
 | 0x80D00 | SerDispatch | Serialize dispatcher |
 | 0x82AB0 | appRealloc | Engine memory allocator |
 | 0x4D455C | memcpy IAT | Import Address Table slot |
+| 0xF9DFEC | GNames (global) | TArray\<FNameEntry*\> — all FName strings |
+
+### GNames Table
+- Address: `base + 0xF9DFEC` → pointer to `TArray<FNameEntry*>`
+- Each entry: `+0x08` = flags (bit0 = Unicode), `+0x10` = string data
+- Used by WeaponStatPatchThread to resolve FName indices to strings
 
 ---
 
@@ -654,3 +667,103 @@ if add > 0 && freeMB >= needMB → clone `add` descriptors
 | Medium fight | 4 × 3 | 12 | 8 | 8 |
 | Large battle | 8 × 5 | 40 | 0 | **none** (already intense) |
 | Boss wave | 2 × 7 | 14 | 6 | 6 |
+
+---
+
+## 9. Weapon Stat Patching (Runtime — WeaponStatPatchThread)
+
+### Configuration
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| MachineGun FireInterval | 0.03s | ~2000 RPM (minigun speed) |
+| MachineGun MaxClip | 100 | Both int + attrib floats |
+| MachineGun MaxReserve | 900 | Both int + attrib floats |
+| Vigor SaltCost multiplier | ×0.5 | All vigors halved |
+| Initial delay | 30s | Wait for game to fully load |
+| Fast scan passes | 12 × 10s | First 2 minutes |
+| Continuous scan | every 30s | Forever (catches level changes) |
+
+### XWeapon Object Offsets Used
+
+| Offset | Field | Type | Patched |
+|--------|-------|------|---------|
+| +0x0240 | StandardFireDelay | float | MachineGun → 0.03 |
+| +0x02BC | ShotCost (tap) | float | Vigors × 0.5 |
+| +0x039C | ShotCost (held) | float | Vigors × 0.5 |
+| +0x07C4 | AmmoCount | int | MachineGun → 100 |
+| +0x07D0 | MaxAmmoAttrib.CurrentValue | float | MachineGun → 100.0 |
+| +0x07D4 | MaxAmmoAttrib.BaseValue | float | MachineGun → 100.0 |
+| +0x07EC | SpareAmmoCount | int | MachineGun → 900 |
+| +0x07F8 | MaxSpareAttrib.CurrentValue | float | MachineGun → 900.0 |
+| +0x07FC | MaxSpareAttrib.BaseValue | float | MachineGun → 900.0 |
+
+### XWeapon DamageType/Projectile Pointers
+
+| Offset | Field | Type | Notes |
+|--------|-------|------|-------|
+| +0x0228 | TapDamageType | UObject* | DamageType for primary/tap fire mode |
+| +0x02EC | TapProjectile | UObject* | Projectile for primary/tap fire mode |
+| +0x0308 | HoldDamageType | UObject* | DamageType for secondary/hold fire mode |
+| +0x03CC | HoldProjectile | UObject* | Projectile for secondary/hold fire mode |
+
+### XWeaponRollingThunder (Bucking Bronco subclass)
+
+Bucking Bronco does NOT use XWeapon — it uses `XWeaponRollingThunder` (different UClass*).
+Same property layout as XWeapon but different class pointer at +0x20.
+
+| Instance | FName Index | DamageType |
+|----------|-------------|------------|
+| Plasmid_BuckingBroncoBase | 68219 | BuckingBronco_Founders_Damage (XRollingThunderDamageType) |
+| Plasmid_BuckingBroncoFounder | 50180 | BuckingBronco_Founders_Damage (tap), BuckingBronco_Trap_Damage (hold) |
+
+### Vigor Combination Approach
+
+Copy DamageType data (+0x28 to +0x128) from source vigor into target vigor's DamageType.
+UObject header (0x00–0x27) is preserved → class vtable stays intact → primary effect retained.
+Secondary effect's damage values/status arrays are layered in via the copied data fields.
+
+Current combinations:
+- **Hell's Rodeo** = Bronco lift (XRollingThunderDamageType vtable) + DevilsKiss fire (data fields)
+
+### Engine Globals (RVAs — stable across sessions)
+
+| Symbol | RVA | Description |
+|--------|-----|-------------|
+| GNames | 0x00F9DFEC | Pointer to global FName table (TArray<FNameEntry*>) |
+| GEngine | 0x00FAA024 | Pointer to UGameEngine singleton (XGameEngine) |
+| GWorld (class) | 0x01000468 | Pointer to XWorldInfo UClass |
+| SecurityCookie | 0x0134BD60 | __security_cookie for stack protection |
+
+### Object Traversal Offsets (stable)
+
+| From | Offset | To | Type |
+|------|--------|----|------|
+| GEngine obj | +0x01B0 | GamePlayers TArray | TArray\<ULocalPlayer*\> (count=1) |
+| GEngine obj | +0x01BC | GameViewportClient | XGameViewportClient instance |
+| LocalPlayer | +0x002C | PlayerController | XPlayerController instance |
+| LocalPlayer | +0x0050 | GameViewportClient | XGameViewportClient (back-ref) |
+| PlayerController | +0x0200 | PlayerReplicationInfo | XPlayerReplicationInfo |
+| PlayerController | +0x023C | LocalPlayer | XLocalPlayer (back-ref) |
+| PlayerController | +0x0240 | Camera | XCamera |
+| PlayerController | +0x02B4 | HUD | HUD |
+| PlayerController | +0x033C | CheatManager class | XCheatManager UClass (not instance) |
+| PlayerController | +0x0340 | PlayerInput | XPlayerInput |
+| PlayerController | +0x0674 | PlayerPawn | XPlayerPawn (class=XHuman) |
+| PlayerPawn | +0x0310 | InvManager class | XInventoryManager UClass (not instance) |
+| PlayerPawn | +0x1DEC | SkyhookMelee | XWeaponDedicatedMelee |
+
+### UFunction Native Addresses
+
+| Function | UFunction Addr | Native RVA | Native VA | Calling Convention |
+|----------|----------------|------------|-----------|-------------------|
+| ConsoleCommand | 0x16824E0C | 0x00136070 | 0x00536070 | thiscall (exec wrapper) |
+| ServerCauseEvent | 0x168322BC | 0x000CFD10 | 0x004CFD10 | thiscall (exec wrapper) |
+
+### DLC Vigor UClasses (present but data-empty in main campaign)
+
+| Vigor | UClass FName | CDO FName |
+|-------|-------------|-----------|
+| Old Man Winter | XWeaponWinterbolt | Default__XWeaponWinterbolt |
+| Peeping Tom | XWeaponChameleon | Default__XWeaponChameleon |
+| Ironsides | XWeaponReturnToSender | Default__XWeaponReturnToSender |

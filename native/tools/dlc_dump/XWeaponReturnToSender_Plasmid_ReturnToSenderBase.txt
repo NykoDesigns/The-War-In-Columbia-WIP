@@ -1,0 +1,99 @@
+// ============================================
+// Class: XWeaponReturnToSender
+// Object: Plasmid_ReturnToSenderBase
+// Outer: Weapons
+// SerialSize: 2500
+// SerialOffset: 0x307E9C
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponReturnToSender'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase'
+begin object name="Plasmid_ReturnToSenderBase" class=XCore.XWeaponReturnToSender
+	// Reference: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DefEnergyBurnRateVsTime'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefEnergyBurnRateVsTime'
+	begin object name="DefEnergyBurnRateVsTime"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DistributionFloatConstantCurve_9971'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefMagicBulletBendAngleVsDistance'
+	begin object name="DistributionFloatConstantCurve_9971"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=4.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_CurveAutoClamped),(InVal=3000.0000000,OutVal=3.0000000,ArriveTangent=-0.0006840,LeaveTangent=-0.0006840,InterpMode=EInterpCurveMode.CIM_CurveAutoClamped),(InVal=5000.0000000,OutVal=0.0000000,ArriveTangent=-0.0020900,LeaveTangent=-0.0020900,InterpMode=EInterpCurveMode.CIM_CurveUser)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DistributionFloatConstantCurve_9973'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DistributionFloatConstantCurve_9973"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=4.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_CurveAutoClamped),(InVal=3000.0000000,OutVal=3.0000000,ArriveTangent=-0.0006840,LeaveTangent=-0.0006840,InterpMode=EInterpCurveMode.CIM_CurveAutoClamped),(InVal=5000.0000000,OutVal=0.0000000,ArriveTangent=-0.0027760,LeaveTangent=-0.0027760,InterpMode=EInterpCurveMode.CIM_CurveUser)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XReturnToSender.Weapons.Plasmid_ReturnToSenderBase.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponReturnToSender.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	ShieldArchetype=XReturnToSenderShield'Arc_XReturnToSender.Created.Plasmid_ReturnToSenderCharge_Shield'
+	EnergyBurnRateVsTime=(Distribution=Distribution=DefEnergyBurnRateVsTime)
+	ReturnToSenderTapShieldDuration=(BaseValue=2.0000000)
+	FireMode[0]=/* ERROR: System.ArgumentOutOfRangeException */
+	FireMode[1]=/* ERROR: System.ArgumentOutOfRangeException */
+	RoundsPerAmmoBunch=3
+	MaxAmmoCountAttrib=(BaseValue=8.0000000)
+	FireOffset=(X=0.0000000,Y=-30.0000000,Z=0.0000000)
+	CrouchedFireOffset=(X=0.0000000,Y=-30.0000000,Z=0.0000000)
+	MagicBulletBendAngleVsDistance=/* ERROR: System.ArgumentOutOfRangeException */
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefZoomedMagicBulletBendAngleVsDistance)
+	TBarMagicBulletBendAngleVsDistance=/* ERROR: System.ArgumentOutOfRangeException */
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarZoomedMagicBulletBendAngleVsDistance)
+	AimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	FiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarZoomedAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarZoomedFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	WeaponSpreadDefault=(MaxSpread=0.0000000)
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'Arc_XReturnToSender.Models_FirstPerson.Plasmid_ReturnToSenderCharge_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XReturnToSender.Models_ThirdPerson.Plasmid_ReturnToSenderCharge_TPModel'
+	WeaponConsumableItemLookupID=474
+	MinDesiredPickupAmount=8
+	MaxDesiredPickupAmount=8
+	BloomingCrosshairFrameName="ReturnToSender"
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

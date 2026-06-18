@@ -1,0 +1,75 @@
+// ============================================
+// Class: XWeapon
+// Object: Plasmid_DevilsKiss
+// Outer: PreCoalescedItemAssets
+// SerialSize: 2358
+// SerialOffset: 0x2F02B4
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeapon'PreCoalescedItemAssets.Plasmid_DevilsKiss'
+begin object name="Plasmid_DevilsKiss" class=XCore.XWeapon
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_DevilsKiss.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeapon.DefMagicBulletBendAngleVsDistance'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_DevilsKiss.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeapon.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_DevilsKiss.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeapon.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_DevilsKiss.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeapon.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	FireMode[0]=/* ERROR: System.ArgumentException */
+	FireMode[1]=/* ERROR: System.ArgumentException */
+	WeaponDamageCategories=/* Array type was not detected. */
+	FireOffset=(X=60.0000000,Y=0.0000000,Z=15.0000000)
+	CrouchedFireOffset=(X=60.0000000,Y=0.0000000,Z=15.0000000)
+	MagicBulletBendAngleVsDistance=(Distribution=Distribution=DefMagicBulletBendAngleVsDistance)
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefZoomedMagicBulletBendAngleVsDistance)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarMagicBulletBendAngleVsDistance)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarZoomedMagicBulletBendAngleVsDistance)
+	ShockedSpreadIncrease=0.0000000
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'Arc_XPlasmidIncinerate.FirstPersonModels.Plasmid_Incinerate_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XPlasmidIncinerate.ThirdPersonModels.Plasmid_Incinerate_TPModel'
+	WeaponUnlockItemLookupID=9
+	WeaponConsumableItemLookupID=241
+	MinDesiredPickupAmount=23
+	MaxDesiredPickupAmount=23
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'VigorIcons.Atlas_Vigor_Icons',Left=192,Width=64,Height=64)
+	AtlassedLargeIcon=(AtlasTexture=Texture2D'VigorIcons_128.Atlas_VigorIcons128',Left=128,Width=128,Height=128)
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

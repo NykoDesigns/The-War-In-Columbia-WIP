@@ -1,0 +1,65 @@
+// Class: XDLCCWeaponChameleon
+// Object: DLCC_Plasmid_Chameleon
+// Size: 3508
+
+// Reference: XDLCCWeaponChameleon'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_Chameleon'
+begin object name="DLCC_Plasmid_Chameleon" class=XCore.XDLCCWeaponChameleon
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_Chameleon.DefaultEnergyBurnRateVsSpeedWhenUpgradeOneIsApplied'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XDLCCWeaponChameleon.DefaultEnergyBurnRateVsSpeedWhenUpgradeOneIsApplied'
+	begin object name="DefaultEnergyBurnRateVsSpeedWhenUpgradeOneIsApplied"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=9.2137370,LeaveTangent=9.2137370,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=0.5000000,OutVal=5.0000000,ArriveTangent=14.4399900,LeaveTangent=14.4399900,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=0.8000000,OutVal=10.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_Chameleon.DistributionFloatConstantCurve_852'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_852" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.5000000,OutVal=5.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=0.8000000,OutVal=10.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_Chameleon.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XDLCCWeaponChameleon.DefMagicBulletBendAngleVsDistance'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_Chameleon.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XDLCCWeaponChameleon.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_Chameleon.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XDLCCWeaponChameleon.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCC_PreCoalescedItemAssets.Plasmids.DLCC_Plasmid_Chameleon.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XDLCCWeaponChameleon.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	HighlightEnemiesTime=-1.0000000
+	EnergyBurnRateVsSpeedWhenUpgradeOneIsApplied=/* ERROR: System.ArgumentException */
+	OverrideSoundTypeCosts=/* Array type was not detected. */
+	UseOverrideSoundTypeCostsIfConditionExists=DamageTypeCondition.DTC_Disabled
+	SoundTypeCosts=/* Array type was not detected. */
+	ChameleonModEffect=(ModEffect=XEffectDynamicGameplayAttributeMod'Arc_XGameplayAttributeEffects.FadeToBlackEffect')
+	EnergyBurnRateVsSpeed=/* ERROR: System.ArgumentOutOfRangeException */
+	FireMode[0]=(StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,bUsesThreePartFire=true,StandardFireDelay=0.5000000,BeginFireTime=0.5000000,FireTimeAttrib=(BaseValue=1.2000000),EndFireTime=0.4000000,WeaponCooldownTimeAttrib=(BaseValue=3.0000000),ShotCostAttrib=(BaseValue=5.0000000),MinAmmoForAttack=20)
+	FireMode[1]=(WeaponFireType=EWeaponFireType.EWFT_Custom,bUsesThreePartFire=true,bChanneledFire=true,bIsSingleShot=true,WeaponCooldownTimeAttrib=(BaseValue=1.0000000),MinAmmoForAttack=5)
+	RoundsPerAmmoBunch=5
+	MagicBulletBendAngleVsDistance=(Distribution=Distribution=DefMagicBulletBendAngleVsDistance)
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefZoomedMagicBulletBendAngleVsDistance)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarMagicBulletBendAngleVsDistance)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarZoomedMagicBulletBendAngleVsDistance)
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'DLCC_PreCoalescedItemAssets.Models_FirstPerson.DLCC_Plasmid_Chameleon_FPModel'
+	WeaponUnlockItemLookupID=1155
+	WeaponConsumableItemLookupID=1170
+	MinDesiredPickupAmount=25
+	MaxDesiredPickupAmount=25
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'DLCC_Icons_64.Atlas_DLCC_Icons_64',Left=256,Width=64,Height=64)
+	AtlassedLargeIcon=(AtlasTexture=Texture2D'DLCC_Icons_128.Atlas_DLCC_Icons_128',Left=128,Width=128,Height=128)
+end object

@@ -79,10 +79,20 @@ The mod modifies BioShock Infinite by:
 - **Damage registration preserved** — Spawner/Delegate fields kept intact for proper combat behavior
 - **Zero crashes** — 26-minute sessions with no stability issues after all fixes deployed
 
-### Weapon Balance (Static)
-- **Damage values** — Granular control over every weapon type
-- **Weapon properties** — Fire rate, magazine size, spread adjustments
-- **Ammo capacity** — Max carry amounts per ammo type
+### Weapon Balance (Runtime + Static)
+- **Fire rate** — Runtime patch: machine gun modified to 0.03s interval (~2000 RPM minigun) ✅
+- **Magazine size** — Runtime patch: machine gun clip set to 100 rounds ✅
+- **Reserve ammo** — Runtime patch: machine gun reserve set to 900 rounds ✅
+- **Vigor salt costs** — Runtime patch: all vigor costs halved ✅
+- **Damage values** — Static: granular control over every weapon type
+- **Ammo capacity** — Static: max carry amounts per ammo type
+- **Persistent across levels** — Weapon patch thread runs continuously, re-applies on level transitions
+
+### Vigor Combinations (Runtime)
+- **Hell's Rodeo** — Bucking Bronco + Devil's Kiss: enemies are lifted AND set on fire ✅
+- **Technique** — Copy DamageType data fields from one vigor into another while preserving the UObject header (class vtable stays intact, so both effects apply)
+- **Rename** — "Bucking Bronco" → "Hell's Rodeo" in all UI strings + localization file ✅
+- **Extensible** — Same pattern works for any future vigor fusions (primary class = primary effect, copied data = secondary effect)
 
 ### Weapon Carry Limit (Implementation Ready)
 - **Goal** — Increase from 2 weapons to 4 via mouse wheel cycling
@@ -193,11 +203,20 @@ The runtime spawn multiplier is implemented as a native DLL injection via `winmm
 
 ```
 winmm.dll (proxy)
-├── InitSpawnHook() — installs MinHook patches
+├── InitSpawnHook() — installs MinHook patches + launches threads
 │   ├── Hook_SpawnRoster() — intercepts TArray growth
 │   ├── Hook_ArSerialize() — guards corrupt streaming reads
 │   ├── Hook_SerDispatch() — upstream serialize guard
-│   └── Hook_memcpy() — backstop with VirtualQuery clamping
+│   ├── Hook_memcpy() — backstop with VirtualQuery clamping
+│   ├── WeaponStatPatchThread() — runtime weapon/vigor stat modification
+│   │   ├── Fire rate, ammo, salt cost patching
+│   │   ├── Runs continuously (every 30s after initial burst)
+│   │   └── Two-phase: archetype collection → instance patching
+│   ├── VigorRenamePatchThread() — vigor display name renaming
+│   └── VigorCombineThread() — vigor effect fusion (Hell's Rodeo)
+│       ├── Finds Bronco (XWeaponRollingThunder) + DevilsKiss (XWeapon)
+│       ├── Copies DamageType data fields (preserves UObject header)
+│       └── Result: lift + fire stacked via class polymorphism
 └── CrashVEH() — vectored exception handler for crash logging
 ```
 
@@ -346,6 +365,13 @@ TheWarInColumbia/
 │   │   ├── ak_nearest.py       # Crash address symbol resolution
 │   │   ├── find_gnames.py      # GNames array locator
 │   │   └── ADDRESSES.md        # Key function RVAs
+│   ├── tools/                  # Live-process reverse engineering scripts
+│   │   ├── dump_attrib_struct.py  # Dumps XAttributeModifiedValue structs
+│   │   ├── find_offset_field.py   # Discovers UProperty::Offset field position
+│   │   ├── probe_max_attrib.py    # Probes MaxAmmo/MaxSpare attrib structs
+│   │   ├── walk_props_v2.py       # Walks XWeapon property chain
+│   │   ├── find_radial.py         # Weapon/vigor radial menu RVA finder
+│   │   └── ...                    # Additional probing/diagnostic tools
 │   └── build/                  # CMake build output
 │       └── bin/Release/winmm.dll
 ├── tools/

@@ -383,3 +383,447 @@ Total functions decompiled: **23**
 | 0x007c7c70 | FUN_007c7c70 | 22 | 2 | 39 | GetObjectRef |
 | 0x0080d220 | FUN_0080d220 | 1762 | 10 | 1 | InitPhysics |
 | 0x008c7d20 | FUN_008c7d20 | 121 | 1 | 7 | InitCollision |
+
+## 14. XWeapon Runtime Stat Patching (CONFIRMED WORKING)
+
+### Overview
+The `WeaponStatPatchThread` in `ue3_spawn.cpp` dynamically modifies weapon properties at runtime by scanning all writable memory pages for XWeapon UObject instances and patching float/int values at known offsets.
+
+### Discovery Process
+1. Found XWeapon FName index via GNames table scan
+2. Located XWeapon UClass by matching FName="XWeapon" + Class metaclass at +0x20
+3. Walked UClass property chain (Children at +0x38, Next at +0x28)
+4. **Key discovery**: `UProperty::Offset` is at **+0x48** on UProperty objects (NOT +0x5C)
+5. Dumped `XAttributeModifiedValue` structs on live instances to map internal layout
+6. Confirmed fire rate, ammo, and salt cost offsets via in-game behavior
+
+### XWeapon Property Offsets (from object start)
+
+| Offset | Property | Type | Notes |
+|--------|----------|------|-------|
+| +0x0240 | StandardFireDelay | float | Fire interval in seconds |
+| +0x02BC | ShotCost (tap) | float | Vigor salt cost per tap |
+| +0x039C | ShotCost (held) | float | Vigor salt cost for charged use |
+| +0x03E1 | AmmoConsumptionPolicy | byte | Ammo consumption type |
+| +0x03F4 | BoolFlags | bitfield | bHasInfiniteAmmoCount, bHasInfiniteSpareAmmoCount, etc. |
+| +0x07B0 | ReloadAmmoCount | int | Rounds restored per reload |
+| +0x07C0 | RoundsPerAmmoBunch | int | Rounds per pickup |
+| +0x07C4 | **AmmoCount** | int | Current clip ammo |
+| +0x07C8 | MaxAmmoCountAttrib | struct(36) | XAttributeModifiedValue for max clip |
+| +0x07EC | **SpareAmmoCount** | int | Current reserve ammo |
+| +0x07F0 | MaxSpareAmmoCountAttrib | struct(36) | XAttributeModifiedValue for max reserve |
+| +0x0814 | LowSpareAmmoPercent | float | Low ammo warning threshold |
+| +0x0818 | LowAmmoPercent | float | Low clip warning threshold |
+
+### XAttributeModifiedValue Struct Layout (36 bytes)
+
+```
++0x00: int/ptr  (usually 0; 0x7F7FFFFF = infinite flag)
++0x04: int      (usually 0)
++0x08: float    CurrentValue — the effective/computed max (game reads this)
++0x0C: float    BaseValue — original base (game recomputes CurrentValue from this)
++0x10-0x20: zeroes (modifier chain, usually empty for guns)
+```
+
+**CRITICAL**: Must patch BOTH `CurrentValue` (+0x08) AND `BaseValue` (+0x0C) within the struct.
+The game recomputes CurrentValue from BaseValue + attribute modifiers every tick.
+Patching only CurrentValue gets overwritten immediately.
+
+### Current Patches Applied
+
+| Target | Offset | Old Value | New Value | Status |
+|--------|--------|-----------|-----------|--------|
+| MachineGun FireInterval | +0x0240 | 0.075-0.170 | 0.03 | ✅ WORKING |
+| MachineGun AmmoCount | +0x07C4 | 35-45 | 100 | ✅ WORKING |
+| MachineGun MaxAmmo.Current | +0x07D0 | 25-45 | 100.0 | ✅ WORKING |
+| MachineGun MaxAmmo.Base | +0x07D4 | 25-45 | 100.0 | ✅ WORKING |
+| MachineGun SpareAmmo | +0x07EC | 75-215 | 900 | ✅ WORKING |
+| MachineGun MaxSpare.Current | +0x07F8 | 75-215 | 900.0 | ✅ WORKING |
+| MachineGun MaxSpare.Base | +0x07FC | 75-215 | 900.0 | ✅ WORKING |
+| Vigor SaltCost (tap) | +0x02BC | varies | ×0.5 | ✅ WORKING |
+| Vigor SaltCost (held) | +0x039C | varies | ×0.5 | ✅ WORKING |
+
+### Two-Phase Patching Strategy
+
+1. **Phase 1** — Collect archetype addresses: scan for XWeapon instances with FName containing "MachineGun" or "Gatling", store their addresses
+2. **Phase 2** — Patch all instances: patch any XWeapon whose FName matches OR whose archetype pointer (+0x24) chains to a known archetype (catches live instances with FName "None")
+
+### Thread Lifecycle
+- Starts 30s after DLL load (game must be fully loaded)
+- First 12 passes: every 10s (fast initial burst)
+- After that: every 30s forever (catches level-change respawns)
+- Idempotent for absolute patches (fire rate, ammo counts)
+- Tracks patched addresses for multiplicative patches (salt cost halving)
+
+### Known MaxAmmo Base Values (original)
+
+| Weapon | MaxAmmo.Base (+0x07D4) | MaxSpare.Base (+0x07FC) |
+|--------|------------------------|-------------------------|
+| MachineGunBase | 45.0 | 215.0 |
+| MachineGunFounder | 35.0 | 105.0 |
+| MachineGunVP | 25.0 | 75.0 |
+| PistolBase | 12.0 | 48.0 |
+| ShotgunBase | 4.0 | 12.0 |
+| CarbineBase | 12.0 | 48.0 |
+| GatlingGun | 25.0 | 75.0 |
+| Elizabeth's weapon | 9999.0 | 6.0 |
+
+---
+
+## 15. Vigor Combination System (Hell's Rodeo)
+
+### Concept
+Vigor combination fuses the effects of two vigors into one. The first implementation
+combines **Bucking Bronco** (lift/levitate enemies) with **Devil's Kiss** (fire damage/burn)
+to create **Hell's Rodeo** — enemies are lifted into the air AND set on fire simultaneously.
+
+### Discovery: Bucking Bronco Is NOT XWeapon
+
+Unlike other vigors (DevilsKiss, Enrage, VoltSwarm) which use the `XWeapon` class,
+Bucking Bronco uses **`XWeaponRollingThunder`** — a subclass of XWeapon. This is why
+the weapon stat patcher's XWeapon class-pointer scan never finds it.
+
+| Vigor | Class | DamageType Class |
+|-------|-------|------------------|
+| Devil's Kiss | XWeapon | XDamageType |
+| Enrage | XWeapon | XDamageType |
+| VoltSwarm | XWeapon | XDamageType |
+| **Bucking Bronco** | **XWeaponRollingThunder** | **XRollingThunderDamageType** |
+
+### XWeapon DamageType Pointer Layout
+
+All XWeapon (and subclass) instances store DamageType object pointers at:
+
+| Offset | Purpose | Example (DevilsKiss) |
+|--------|---------|---------------------|
+| +0x0228 | Tap/primary DamageType* | `DevilsKiss_TapGrenade_Damage` (XDamageType) |
+| +0x02EC | Tap/primary Projectile* | `DevilsKiss_TapGrenade_Projectile` (XProjectile) |
+| +0x0308 | Hold/secondary DamageType* | `DevilsKiss_HoldGrenade_Damage` (XDamageType) |
+| +0x03CC | Hold/secondary Projectile* | `DevilsKiss_HoldGrenade_Projectile` (XProximityGrenadeProjectile) |
+
+### Bronco Instance Layout
+
+| Instance | Address (runtime) | Class | Archetype |
+|----------|-------------------|-------|-----------|
+| Plasmid_BuckingBroncoBase | 0x36BDF000 | XWeaponRollingThunder | Default__XWeaponRollingThunder |
+| Plasmid_BuckingBroncoFounder | 0x77492000 | XWeaponRollingThunder | Plasmid_BuckingBroncoBase |
+
+Bronco DamageType instances:
+- **Tap**: `BuckingBronco_Founders_Damage` (class: XRollingThunderDamageType)
+- **Hold**: `BuckingBronco_Trap_Damage` (class: XRollingThunderDamageType)
+
+### Combination Strategy: Data Copy with Header Preservation
+
+The key insight: **lift behavior comes from the class vtable** (XRollingThunderDamageType code),
+while **fire damage/effects come from the data fields** (inherited from base XDamageType).
+
+By copying the DamageType DATA from DevilsKiss into Bronco's DamageType object while
+**preserving the UObject header** (first 0x28 bytes), we get both effects:
+
+```
+┌──────────────────────────────────────────────────┐
+│ UObject Header (0x00–0x27) — PRESERVED           │
+│   +0x00: vtable → XRollingThunderDamageType      │  ← LIFT behavior
+│   +0x04: HashNext                                │
+│   +0x08: ObjectFlags                             │
+│   +0x0C: HashBucket                              │
+│   +0x10: StateFrame                              │
+│   +0x14: Outer                                   │
+│   +0x18: FName (BuckingBronco_Founders_Damage)   │
+│   +0x20: UClass* (XRollingThunderDamageType)     │
+│   +0x24: Archetype*                              │
+├──────────────────────────────────────────────────┤
+│ DamageType Data (0x28–0x128) — COPIED FROM DK   │
+│   +0x28: bKillOnDeath flag                       │
+│   +0x2C: DamageRadius (float) = 2000.0           │  ← DK fire values
+│   +0x30: DamageOverTime (float) = 2000.0         │
+│   +0x34: DamageImpulse (float) = 1000.0          │
+│   +0x38: DamageMomentum (float) = 800.0          │
+│   +0x3C: DamageKnockback (float) = -100.0        │
+│   +0x40: DamageArea (float) = 2000.0             │
+│   +0x44–0x80: Effect/status arrays (fire VFX)    │  ← FIRE visual effects
+│   +0x88: XEffectSpeech reference                 │
+│   +0x9C: DamageMultiplier table                  │
+│   +0xF8: MaxRange (float) = 100.0                │
+│   +0xFC: OptimalRange (float) = 250.0            │
+└──────────────────────────────────────────────────┘
+```
+
+Result: XRollingThunderDamageType::ProcessDamage() applies lift (from vtable),
+then base XDamageType fields apply fire damage/effects (from copied data).
+
+### Implementation: VigorCombineThread
+
+Located in `native/src/ue3_spawn.cpp`. Separate background thread (35s initial delay).
+
+1. Resolves FName indices for `Plasmid_BuckingBroncoBase`, `Plasmid_BuckingBroncoFounder`, `Plasmid_DevilsKiss`
+2. Scans all writable pages for UObject instances matching those FNames (by name index + number == 0)
+3. Reads DamageType pointers at +0x0228 (tap) and +0x0308 (hold)
+4. Copies 0x100 bytes from DK DamageType +0x28 into Bronco DamageType +0x28
+5. Runs continuously (handles level transitions creating new instances)
+
+### Rename: Bucking Bronco → Hell's Rodeo
+
+Handled by `VigorRenamePatchThread` (same as other vigor renames):
+- UPPERCASE UTF-16: `"BUCKING BRONCO"` → `"HELL'S RODEO"`
+- Mixed-case UTF-16 + ASCII: `"Bucking Bronco"` → `"Hell's Rodeo"`
+- Lowercase UTF-16: `"bucking bronco"` → `"hell's rodeo"`
+
+Plus `UserInterface.int` localization file patched statically (6 entries).
+
+### Future Vigor Combinations
+
+This establishes the pattern for any future combinations:
+1. Identify the two vigors' DamageType classes
+2. Determine which provides the "primary effect" (keep its class/vtable)
+3. Copy data fields from the "secondary effect" DamageType
+4. Both effects stack via class polymorphism + inherited data fields
+
+---
+
+## 16. DLC Vigor Integration (In Progress)
+
+### Goal
+
+Bring the three DLC-exclusive vigors into the main campaign:
+- **Old Man Winter** (XWeaponWinterbolt) — freeze enemies
+- **Peeping Tom** (XWeaponChameleon) — invisibility
+- **Ironsides** (XWeaponReturnToSender) — projectile shield / return
+
+### DLC Vigor Classes (Loaded in Memory)
+
+The UClasses and CDOs for DLC vigors exist in memory even during the main campaign
+(they come from the base `XGame.xxx` script package):
+
+| Vigor | UClass FName | CDO FName | Status |
+|-------|-------------|-----------|--------|
+| Old Man Winter | XWeaponWinterbolt | Default__XWeaponWinterbolt | Class loaded, CDO empty |
+| Peeping Tom | XWeaponChameleon | Default__XWeaponChameleon | Class loaded, CDO empty |
+| Ironsides | XWeaponReturnToSender | Default__XWeaponReturnToSender | Class loaded, CDO empty |
+
+The CDOs are **empty shells** — all property data is zeroed. This means the C++ code/vtable
+exists, but there are no configured damage types, projectiles, salt costs, or effects.
+The actual configured archetypes (e.g., `Plasmid_WinterBolt`) live inside the DLC coalesced
+packages on disk.
+
+### DLC Package Locations
+
+```
+D:\SteamLibrary\steamapps\common\BioShock Infinite\DLC\
+├── DLCB\CookedPCConsole_FR\    ← Burial at Sea Episode 1
+│   ├── dlcb_CoalescedItems.xxx
+│   └── ... (maps, textures, audio)
+└── DLCC\CookedPCConsole_FR\    ← Burial at Sea Episode 2
+    ├── dlcc_CoalescedItems.xxx
+    └── ...
+```
+
+### Approach 1: Config-Based Package Loading (FAILED)
+
+Added `SeekFreePackage=dlcb_CoalescedItems` and DLC `SeekFreePCPaths` to both
+`DefaultEngine.ini` and user `XEngine.ini`. **Result: fatal crash on startup.**
+
+- Error 1: `GetOutermost() Address = 0x4c6730` — package hierarchy failure
+- Error 2: `I/O failure operating on 'Core'` — engine package system corrupted
+
+The DLC coalesced packages have dependencies/structures incompatible with being
+force-loaded as startup SeekFreePackages in the main campaign context.
+
+**All config changes were reverted.**
+
+### Approach 2: Dev Console Commands (BLOCKED)
+
+Attempted to enable the in-game developer console:
+- `[Engine.Console] ConsoleKey=Tilde` — already set, but `XCore.XConsole` overrides it
+- Added `ConsoleKey=Tilde` to `[XCore.XConsole]` section in `XInput.ini`
+- Removed conflicting Tilde → `WIDGETCOORDSYSTEMCYCLE` keybinding
+
+**Result: Tilde key still does not open the console.** The shipping build of BioShock
+Infinite likely has the console disabled at the code level (common for retail UE3 games).
+
+### Approach 3: DLL-Based Engine Function Calls (CURRENT)
+
+Call engine functions directly from our injected DLL to load packages and execute
+commands at runtime. This requires finding function addresses via reverse engineering.
+
+#### Engine Globals Found
+
+| Symbol | RVA | Runtime Address | Notes |
+|--------|-----|-----------------|-------|
+| GNames | 0x00F9DFEC | base+0xF9DFEC | Global FName table pointer |
+| GEngine | 0x00FAA024 | → XGameEngine obj | UGameEngine singleton |
+| GWorld (class) | 0x01000468 | → XWorldInfo class | UClass, not instance |
+
+#### Object Traversal Chain
+
+```
+GEngine (base+0x00FAA024)
+└── XGameEngine @ 0x36C7EA00
+    ├── +0x00B0: XGameViewportClient UClass
+    ├── +0x01B0: TArray<ULocalPlayer*> [count=1, max=4]
+    │   └── [0] XLocalPlayer @ 0x36B9C400
+    │       ├── +0x002C: XPlayerController @ 0x65225400
+    │       │   ├── vtable @ 0x011B2AC0
+    │       │   ├── +0x0200: XPlayerReplicationInfo
+    │       │   ├── +0x023C: XLocalPlayer (back-ref)
+    │       │   ├── +0x0240: XCamera
+    │       │   ├── +0x02B4: HUD
+    │       │   ├── +0x033C: XCheatManager (UClass, no instance)
+    │       │   ├── +0x0340: XPlayerInput
+    │       │   └── +0x0674: XPlayerPawn @ 0x63386000
+    │       │       ├── class = XHuman
+    │       │       ├── +0x0310: XInventoryManager (UClass, no instance)
+    │       │       └── +0x1DEC: SkyhookMelee (XWeaponDedicatedMelee)
+    │       └── +0x0050: XGameViewportClient @ 0x36C3E000
+    └── +0x01BC: XGameViewportClient @ 0x36C3E000
+```
+
+**Note**: Addresses like 0x65225400 are runtime heap allocations — they change every
+session. The RVAs for globals and the traversal offsets (+0x01B0, +0x002C, etc.) are stable.
+
+#### Key UFunction Addresses
+
+Found by walking the `XPlayerController` class hierarchy's Children chain:
+
+| Function | UFunction Address | Native Func VA | Native Func RVA | Notes |
+|----------|-------------------|----------------|-----------------|-------|
+| ConsoleCommand | 0x16824E0C | 0x00536070 | 0x00136070 | exec wrapper; params: FString Command, bool bWriteToLog → FString |
+| ServerCauseEvent | 0x168322BC | 0x004CFD10 | 0x000CFD10 | Triggers Kismet `ce` events; params: FName EventName → int |
+
+##### ConsoleCommand Parameter Layout (PropertySize = 25)
+
+| Param | Type | Offset | Size |
+|-------|------|--------|------|
+| Command | StrProperty (FString) | 0x00 | 12 |
+| bWriteToLog | BoolProperty | 0x0C | 1 |
+| ReturnValue | StrProperty (FString) | 0x10 | 12 |
+
+##### ServerCauseEvent Parameter Layout
+
+| Param | Type | Offset | Size |
+|-------|------|--------|------|
+| EventName | NameProperty (FName) | 0x00 | 8 |
+| EventTypesFound | IntProperty (out) | 0x08 | 4 |
+
+#### Internal Call Targets (from exec wrappers)
+
+**execConsoleCommand** (VA 0x00536070):
+- +0x48: CALL 0x00513BE0 — FFrame parameter reader
+- +0x5E: CALL [EAX+0x90] — **indirect vtable call** (the actual ConsoleCommand dispatch)
+- +0x75: CALL 0x0049CB50 — FString::operator= (copies return value)
+- RET at +0x8B
+
+The key is the **indirect call at +0x5E**: `CALL [EAX+0x90]`. This reads the vtable from
+the PlayerController and calls offset 0x90/4 = vtable index **36**. This is likely
+`UObject::CallFunction` or `ProcessInternal`, which dispatches to the actual command
+processing chain (ProcessConsoleExec → Exec → command handlers).
+
+**execServerCauseEvent** (VA 0x004CFD10):
+- +0x44: CALL 0x004CCFB0 — parameter parser (reads FName from stack)
+- +0x80: CALL 0x004A10F0 — **actual CauseEvent implementation** (117 bytes)
+  - Internally calls 0x00493B80 (Kismet sequence iteration)
+- RET at +0xB1
+
+#### LoadPackage-Related Functions
+
+| Description | RVA | VA | Found via |
+|-------------|-----|----|-----------|
+| "Failed to load package header" handler | 0x000FB540 | 0x004FB540 | Unicode string xref |
+| Caller of above (ULinkerLoad::Load?) | 0x0010AEE0 | 0x0050AEE0 | CALL xref; ~1017 bytes, 20 CALLs |
+| "Failed to load package '%s'" handler A | 0x002002F0 | 0x006002F0 | Unicode string xref |
+| "Failed to load package '%s'" handler B | 0x00202016 | 0x00602016 | Unicode string xref |
+| Error formatting (appMsgf?) | 0x000A70F0 | 0x004A70F0 | Called by both handlers |
+
+### Remaining Work
+
+1. **Call ServerCauseEvent from DLL** — test with base-game cheats (e.g., `CheatShockJockey`)
+   to verify the mechanism works before attempting DLC-specific calls
+2. **Load DLC packages at runtime** — find and call `UObject::LoadPackage` or
+   `StaticLoadObject` from the game thread (must not call from background thread)
+3. **Instantiate DLC vigor archetypes** — once the package is loaded, the configured
+   archetypes should appear in memory with populated data fields
+4. **Add to player inventory** — find the weapon/vigor slot management system and
+   insert the new vigor instances
+
+### Base-Game Cheat FNames (for testing)
+
+| FName | Purpose |
+|-------|---------|
+| CheatMurderOfCrows | Give Murder of Crows vigor |
+| CheatShockJockey | Give Shock Jockey vigor |
+| CheatDevilsKiss | Give Devil's Kiss vigor |
+| CheatBuckingBronco | Give Bucking Bronco vigor |
+| CheatPossession | Give Possession vigor |
+| CheatReturnToSender | Give Return to Sender vigor |
+| CheatUndertow | Give Undertow vigor |
+| CheatChargeAttack | Give Charge vigor |
+
+**No DLC vigor cheat events exist** (no CheatWinterBolt, etc.), confirming that the
+Kismet-based cheat system only covers base-game vigors.
+
+### Tool Chain for Package Extraction (WORKING)
+
+1. **Decompress**: `Z:\UEdecompress\decompress.exe <package.xxx>` → outputs to `unpacked/`
+2. **Parse**: UELib (`Z:\UEEXPLORER\Eliot.UELib.dll`) with `InitFlags.All`
+3. **Dump**: `z:\TheWarInColumbia\native\tools\dlc_dumper\` C# project
+
+### Extracted DLC Vigor Properties
+
+#### Old Man Winter (XWeaponWinterbolt) — DLCB
+- **Package**: `DLCB_Arc_XWinterBolt`
+- **FireMode[0] (Tap — freeze bolt)**:
+  - WeaponFireType = Projectile
+  - DamageType = `XDLCBDamageType'Plasmid_WinterBolt_TapDamage'`
+  - bUsesThreePartFire=true, bChanneledFire=true, bIsSingleShot=true
+  - BeginFireTime=1.0, FireTime=2.0, EndFireTime=0.666, Cooldown=1.0
+  - **ShotCost=33**, MinAmmoForAttack=33
+  - ProjectileArchetype = `XActorSpawningProjectile'Plasmid_WinterBolt_TapProjectile'`
+- **FireMode[1] (Hold — freeze trap)**:
+  - DamageType = `XDamageType'WinterBolt_HoldGrenade_Damage'`
+  - BeginFireTime=0.1, EndFireTime=0.6
+  - **ShotCost=66**, MinAmmoForAttack=66
+  - ProjectileArchetype = `XProximityGrenadeProjectile'WinterBolt_HoldGrenade_Projectile'`
+- WeaponUnlockItemLookupID=965, WeaponConsumableItemLookupID=933
+- MinDesiredPickupAmount=20, MaxDesiredPickupAmount=20
+
+#### Peeping Tom (XDLCCWeaponChameleon) — DLCC
+- **Package**: `DLCC_PreCoalescedItemAssets`
+- **FireMode[0] (Activate invisibility)**:
+  - bUsesThreePartFire=true, StandardFireDelay=0.5
+  - BeginFireTime=0.5, FireTime=1.2, EndFireTime=0.4, Cooldown=3.0
+  - **ShotCost=5**, MinAmmoForAttack=20
+- **FireMode[1] (Channeled invisibility)**:
+  - WeaponFireType = Custom, bChanneledFire=true, bIsSingleShot=true
+  - Cooldown=1.0, MinAmmoForAttack=5
+- ChameleonModEffect = `XEffectDynamicGameplayAttributeMod'FadeToBlackEffect'`
+- HighlightEnemiesTime=-1.0 (disabled in DLCC; DLCB version doesn't have this)
+- EnergyBurnRateVsSpeed: 0→0, 0.5→5.0, 0.8→10.0 (salt/sec vs movement speed)
+- RoundsPerAmmoBunch=5
+- WeaponUnlockItemLookupID=1155, WeaponConsumableItemLookupID=1170
+
+#### Ironsides (XWeaponReturnToSender) — DLCC
+- **Package**: `DLCC_PreCoalescedItemAssets`
+- ShieldArchetype = `XDLCCReturnToSenderShield'DLCC_Plasmid_ReturnToSenderInsta_Shield'`
+- ReturnToSenderTapShieldDuration.BaseValue=2.0
+- ReturnToSenderShouldAbsorbAmmoAttrib.BaseValue=1.0
+- ReturnToSenderMinShieldAbsorbDamageForTrapAttrib.BaseValue=0.0
+- **FireMode[1]**:
+  - DamageType = `XDamageType'Plasmid_ReturnToSenderCharge_Damage'`
+  - BeginFireTime=0.5, FireTime=1.0, EndFireTime=0.3, Cooldown=1.0
+  - ProjectileArchetype = `XReturnToSenderProxyGrenade'..._Upgrade_Projectile'`
+- RoundsPerAmmoBunch=3, MaxAmmoCount.BaseValue=6.0
+- WeaponUnlockItemLookupID=1169, WeaponConsumableItemLookupID=1208
+
+### DLC-Specific Classes Discovered
+
+| Class | Game | Purpose |
+|-------|------|---------|
+| XWeaponWinterbolt | DLCB/C | Old Man Winter vigor |
+| XWeaponChameleon | DLCB | Peeping Tom (BaS Ep1 version) |
+| XDLCCWeaponChameleon | DLCC | Peeping Tom (BaS Ep2 version, with upgrades) |
+| XWeaponReturnToSender | DLCB/C | Return to Sender / Ironsides |
+| XDLCBDamageType | DLCB | Freeze damage (extends XDamageType) |
+| XDLCCDamageType | DLCC | DLCC-specific damage type |
+| XDLCCReturnToSenderShield | DLCC | Ironsides shield object |
+| XDLCCProximityGrenadeProjectile | DLCC | DLCC trap projectile |
+| XDLC2Weapon | DLCC | DLCC generic weapon (Shock Jockey variant) |

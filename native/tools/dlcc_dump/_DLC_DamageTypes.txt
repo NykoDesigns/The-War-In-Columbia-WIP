@@ -1,0 +1,20 @@
+// All DLC-specific DamageTypes
+  XDLCBDamageType | Plasmid_WinterBolt_TapDamage | sz=2637
+  XDamageType | CarbineBulletDLCB | sz=9467
+  XDamageType | HandCannonFounder_DamageDLCB | sz=9294
+  XDamageType | ShotgunDamageDLCB | sz=16027
+  XDamageType | DLCB_SkyhookPlayerMeleeDamage | sz=1774
+  XDamageType | WinterBolt_HoldGrenade_Damage | sz=2538
+  XDamageType | Charge_DLCB_Damage | sz=3370
+  XDamageType | DLCB_Plasmid_MesmerizeTrap_Damage | sz=3840
+  XDamageType | DLCB_VoltSwarmFounder_UpgradedBolt_FirstChain_Damage | sz=3624
+  XDamageType | MachineGunBulletDLCB | sz=9467
+  XDamageType | DevilsKiss_HoldGrenade_DLCB_Damage | sz=2337
+  XDamageType | DevilsKiss_Mesmerize_DLCB_Damage | sz=2683
+  XDamageType | DevilsKiss_TapGrenade_DLCB_Damage | sz=4840
+  XDamageType | DLCB_VoltSwarmFounder_BoltDamage | sz=3152
+  XDamageType | Enrage_DLCB_Damage | sz=3023
+  XDamageType | UndertowDLCB_Slap_Damage | sz=1665
+  XDLCBDamageType | BeamCannonDLCBDamage | sz=2867
+  XDLCBDamageType | DLCC_BeamCannon_Damage | sz=2867
+  XDLCBDamageType | DLCC_Plasmid_WinterBolt_TapDamage | sz=1344

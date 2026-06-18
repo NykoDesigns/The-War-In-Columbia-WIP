@@ -1845,6 +1845,1250 @@ static void* __cdecl Hook_memcpy(void* dst, const void* src, size_t count)
     return Real_memcpy(dst, src, count);
 }
 
+// ─── Vigor Name Runtime Patcher ──────────────────────────────────────────
+// Scaleform stores vigor display names as UPPERCASE UTF-16LE. UE3 FStrings
+// are mixed-case UTF-16LE. There are also lowercase and ASCII copies.
+// We must patch ALL variants. FName references ("MurderOfCrows") are internal
+// IDs and must NOT be touched.
+static DWORD WINAPI VigorRenamePatchThread(LPVOID) {
+    // Each vigor rename has multiple string variants to patch
+    struct Pattern {
+        const wchar_t* oldW;  const wchar_t* newW;   // UTF-16 pair
+        const char*    oldA;  const char*    newA;    // ASCII pair (null = skip)
+    };
+    static const Pattern patterns[] = {
+        // ── Murder of Crows → Carrion Call ──
+        // Scaleform display (UPPERCASE) — the ones the player sees
+        { L"MURDER OF CROWS", L"CARRION CALL", nullptr, nullptr },
+        // UE3 FString (mixed-case) — tooltips/combos
+        { L"Murder of Crows", L"Carrion Call", "Murder of Crows", "Carrion Call" },
+        // Lowercase lookups
+        { L"murder of crows", L"carrion call", nullptr, nullptr },
+
+        // ── Bucking Bronco → Hell's Rodeo ──
+        // Scaleform display (UPPERCASE)
+        { L"BUCKING BRONCO", L"HELL'S RODEO", nullptr, nullptr },
+        // UE3 FString (mixed-case)
+        { L"Bucking Bronco", L"Hell's Rodeo", "Bucking Bronco", "Hell's Rodeo" },
+        // Lowercase lookups
+        { L"bucking bronco", L"hell's rodeo", nullptr, nullptr },
+
+        // NOTE: Machine Gun → Lead Hose is handled via localization file patches only
+        // (UserInterface.int + GlobalXItemDatabase.INT). The broad memory scan is NOT
+        // safe for "Machine Gun" — the string appears inside Wwise audio bank data and
+        // overwriting it corrupts AK::MemoryMgr, causing GetOutermost() crash.
+
+        // Sentinel
+        { nullptr, nullptr, nullptr, nullptr }
+    };
+
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    unsigned char* scanAddr = (unsigned char*)si.lpMinimumApplicationAddress;
+    unsigned char* maxAddr  = (unsigned char*)si.lpMaximumApplicationAddress;
+    int grandTotal = 0;
+
+    // Scan repeatedly: 5s, 15s, 25s, 35s, ... (every 10s for 2 min)
+    Sleep(5000);
+    for (int pass = 0; pass < 12; pass++) {
+        if (pass > 0) Sleep(10000);
+        int passPatches = 0;
+
+        for (int pi = 0; patterns[pi].oldW; pi++) {
+            const auto& p = patterns[pi];
+
+            // Build UTF-16 search/replace
+            int oldWChars = (int)wcslen(p.oldW);
+            int newWChars = (int)wcslen(p.newW);
+            if (newWChars > oldWChars) continue;
+            int wPatBytes = (oldWChars + 1) * (int)sizeof(wchar_t);
+            wchar_t wReplace[64] = {};
+            wcscpy_s(wReplace, 64, p.newW);
+
+            // Build ASCII search/replace (if applicable)
+            int aPatBytes = 0;
+            char aReplace[64] = {};
+            if (p.oldA) {
+                int oldALen = (int)strlen(p.oldA);
+                int newALen = (int)strlen(p.newA);
+                if (newALen <= oldALen) {
+                    aPatBytes = oldALen + 1;
+                    strcpy_s(aReplace, 64, p.newA);
+                }
+            }
+
+            unsigned char* scan = scanAddr;
+            MEMORY_BASIC_INFORMATION mbi;
+
+            while (scan < maxAddr) {
+                if (VirtualQuery(scan, &mbi, sizeof(mbi)) == 0) break;
+                unsigned char* regionEnd = (unsigned char*)mbi.BaseAddress + mbi.RegionSize;
+                if (regionEnd <= scan) break;
+
+                if (mbi.State == MEM_COMMIT &&
+                    !(mbi.Protect & PAGE_GUARD) &&
+                    (mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY))) {
+                    unsigned char* base = (unsigned char*)mbi.BaseAddress;
+                    SIZE_T regionSize = mbi.RegionSize;
+
+                    __try {
+                        // Scan for UTF-16 pattern
+                        for (SIZE_T i = 0; i + wPatBytes <= regionSize; i += 2) {
+                            if (memcmp(base + i, p.oldW, wPatBytes) == 0) {
+                                memcpy(base + i, wReplace, wPatBytes);
+                                passPatches++;
+                            }
+                        }
+                        // Scan for ASCII pattern
+                        if (aPatBytes > 0) {
+                            for (SIZE_T i = 0; i + aPatBytes <= regionSize; i++) {
+                                if (memcmp(base + i, p.oldA, aPatBytes) == 0) {
+                                    memcpy(base + i, aReplace, aPatBytes);
+                                    passPatches++;
+                                }
+                            }
+                        }
+                    } __except(EXCEPTION_EXECUTE_HANDLER) { }
+                }
+                scan = regionEnd;
+            }
+        }
+        grandTotal += passPatches;
+        if (passPatches > 0) {
+            SLog("VIGOR-RENAME: pass %d — %d new patches (%d total)",
+                 pass, passPatches, grandTotal);
+        }
+    }
+    SLog("VIGOR-RENAME: Done after 12 passes. Grand total: %d patches.", grandTotal);
+    return 0;
+}
+
+// ─── Vigor Combinations ──────────────────────────────────────────────────
+// COMBO 1: Hell's Rodeo (Bronco + Devil's Kiss)
+//   Bronco uses XWeaponRollingThunder with XRollingThunderDamageType.
+//   Copy DamageType DATA from DK into Bronco (preserve UObject header/vtable).
+//   Result: enemies get lifted AND set on fire.
+//
+// COMBO 2: Carrion Contract (Possession + Murder of Crows)
+//   Possession is internally "Enrage" (Plasmid_EnrageFounder, XWeapon class).
+//   Both Enrage and Crows use base XDamageType → can't use vtable polymorphism.
+//   Strategy: swap Possession's projectile pointer to Crows' XMurderOfCrowsProjectile.
+//   Possession keeps its Enrage DamageType → possession effect on hit.
+//   Crows' projectile spawns crow swarm AoE → stuns nearby enemies.
+//   Result: fire Possession → crow swarm hits group → target possessed, others stunned.
+static DWORD WINAPI VigorCombineThread(LPVOID) {
+    // Offsets within XWeapon/XWeaponRollingThunder for DamageType pointers
+    static const unsigned OFF_TAP_DMG_TYPE  = 0x0228; // UObject* DamageType for tap/primary
+    static const unsigned OFF_HOLD_DMG_TYPE = 0x0308; // UObject* DamageType for hold/secondary
+    static const unsigned OFF_TAP_PROJ      = 0x02EC; // UObject* Projectile for tap/primary
+    static const unsigned OFF_HOLD_PROJ     = 0x03CC; // UObject* Projectile for hold/secondary
+
+    // UObject header size — we preserve this, copy everything after
+    static const unsigned UOBJ_HEADER_SIZE = 0x28; // vtable+hash+flags+index+outer+name+class+archetype
+    // Total DamageType data to copy (beyond header)
+    static const unsigned DMG_DATA_SIZE = 0x100; // bytes +0x28 to +0x128 covers all damage fields
+
+    Sleep(35000); // wait 35s (after weapon stat thread starts)
+    SLog("VIGOR-COMBO: Thread started. Looking for vigor combo targets...");
+
+    void** gnamesPtr = *reinterpret_cast<void***>(g_Base + RVA_GNames);
+    if (!gnamesPtr) { SLog("VIGOR-COMBO: ERROR — GNames is null!"); return 0; }
+
+    // ── Step 1: Find FName indices for all combo vigors ──
+    // Hell's Rodeo: Bronco + DevilsKiss
+    int broncoBaseIdx = -1, broncoFounderIdx = -1, devilsKissIdx = -1;
+    int xwrtIdx = -1; // XWeaponRollingThunder
+    // Carrion Contract: Possession (Enrage) + Murder of Crows
+    int enrageBaseIdx = -1, enrageFounderIdx = -1;
+    int crowsBaseIdx = -1, crowsFounderIdx = -1;
+    __try {
+        for (int i = 0; i < 200000; i++) {
+            if (IsBadReadPtr(gnamesPtr + i, 4)) continue;
+            char* entry = reinterpret_cast<char*>(gnamesPtr[i]);
+            if (!entry || IsBadReadPtr(entry, OFF_FNameEntry_Str + 32)) continue;
+            DWORD flags = *reinterpret_cast<DWORD*>(entry + OFF_FNameEntry_Flags);
+            const char* str;
+            if (flags & 1) continue; // skip wide names for now
+            str = reinterpret_cast<const char*>(entry + OFF_FNameEntry_Str);
+            if (IsBadStringPtrA(str, 64)) continue;
+            // Hell's Rodeo FNames
+            if (strcmp(str, "Plasmid_BuckingBroncoBase") == 0)     broncoBaseIdx = i;
+            else if (strcmp(str, "Plasmid_BuckingBroncoFounder") == 0) broncoFounderIdx = i;
+            else if (strcmp(str, "Plasmid_DevilsKiss") == 0)       devilsKissIdx = i;
+            else if (strcmp(str, "XWeaponRollingThunder") == 0)    xwrtIdx = i;
+            // Carrion Contract FNames
+            else if (strcmp(str, "Plasmid_EnrageBase") == 0)       enrageBaseIdx = i;
+            else if (strcmp(str, "Plasmid_EnrageFounder") == 0)    enrageFounderIdx = i;
+            else if (strcmp(str, "Plasmid_MurderOfCrowsBase") == 0)  crowsBaseIdx = i;
+            else if (strcmp(str, "Plasmid_MurderOfCrowsFounder") == 0) crowsFounderIdx = i;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    SLog("VIGOR-COMBO: FNames: BroncoBase=%d BroncoFounder=%d DevilsKiss=%d XWRT=%d",
+         broncoBaseIdx, broncoFounderIdx, devilsKissIdx, xwrtIdx);
+    SLog("VIGOR-COMBO: FNames: EnrageBase=%d EnrageFounder=%d CrowsBase=%d CrowsFounder=%d",
+         enrageBaseIdx, enrageFounderIdx, crowsBaseIdx, crowsFounderIdx);
+
+    if (devilsKissIdx < 0) {
+        SLog("VIGOR-COMBO: WARNING — DevilsKiss FName not found (Hell's Rodeo disabled)");
+    }
+    if (broncoBaseIdx < 0 && broncoFounderIdx < 0) {
+        SLog("VIGOR-COMBO: WARNING — No Bronco FNames found (Hell's Rodeo disabled)");
+    }
+    if (enrageBaseIdx < 0 && enrageFounderIdx < 0) {
+        SLog("VIGOR-COMBO: WARNING — No Enrage/Possession FNames found (Carrion Contract disabled)");
+    }
+    if (crowsBaseIdx < 0 && crowsFounderIdx < 0) {
+        SLog("VIGOR-COMBO: WARNING — No Crows FNames found (Carrion Contract disabled)");
+    }
+
+    // ── Step 2: Scan memory for the actual weapon instances ──
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    unsigned char* scanMin = (unsigned char*)si.lpMinimumApplicationAddress;
+    unsigned char* scanMax = (unsigned char*)si.lpMaximumApplicationAddress;
+    MEMORY_BASIC_INFORMATION mbi;
+
+    // We need to find these objects by FName:
+    // Hell's Rodeo
+    void* broncoWeapon = nullptr;   // Plasmid_BuckingBroncoFounder (or Base)
+    void* devilsKissWeapon = nullptr; // Plasmid_DevilsKiss
+    bool hellsRodeoDone = false;
+    // Carrion Contract
+    void* enrageWeapon = nullptr;   // Plasmid_EnrageFounder (or Base) = Possession
+    void* crowsWeapon = nullptr;    // Plasmid_MurderOfCrowsFounder (or Base)
+    bool carrionContractDone = false;
+
+    for (int pass = 0; ; pass++) {
+        if (pass > 0) Sleep(pass < 12 ? 10000 : 30000);
+
+        void* newBroncoBase = nullptr;
+        void* newBroncoFounder = nullptr;
+        void* newDevilsKiss = nullptr;
+        void* newEnrageBase = nullptr;
+        void* newEnrageFounder = nullptr;
+        void* newCrowsBase = nullptr;
+        void* newCrowsFounder = nullptr;
+
+        unsigned char* scan = scanMin;
+        while (scan < scanMax) {
+            if (VirtualQuery(scan, &mbi, sizeof(mbi)) == 0) break;
+            unsigned char* regionEnd = (unsigned char*)mbi.BaseAddress + mbi.RegionSize;
+            if (regionEnd <= scan) break;
+
+            if (mbi.State == MEM_COMMIT && !(mbi.Protect & PAGE_GUARD) &&
+                (mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY))) {
+                unsigned char* rbase = (unsigned char*)mbi.BaseAddress;
+                SIZE_T sz = mbi.RegionSize;
+
+                __try {
+                    for (SIZE_T i = 0; i + 0x400 <= sz; i += 4) {
+                        int nameIdx = *reinterpret_cast<int*>(rbase + i + OFF_Name);
+                        int nameNum = *reinterpret_cast<int*>(rbase + i + OFF_Name + 4);
+                        if (nameNum != 0) continue; // only _0 instances
+
+                        void* objAddr = rbase + i;
+
+                        // Check for Bronco (XWeaponRollingThunder instances)
+                        if (nameIdx == broncoFounderIdx) {
+                            // Verify it has a valid class pointer
+                            void* cls = *reinterpret_cast<void**>((char*)objAddr + OFF_Class);
+                            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                                int clsNameIdx = *reinterpret_cast<int*>((char*)cls + OFF_Name);
+                                if (clsNameIdx == xwrtIdx || clsNameIdx > 0) {
+                                    newBroncoFounder = objAddr;
+                                }
+                            }
+                        } else if (nameIdx == broncoBaseIdx) {
+                            void* cls = *reinterpret_cast<void**>((char*)objAddr + OFF_Class);
+                            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                                newBroncoBase = objAddr;
+                            }
+                        }
+
+                        // Check for DevilsKiss
+                        if (nameIdx == devilsKissIdx) {
+                            void* cls = *reinterpret_cast<void**>((char*)objAddr + OFF_Class);
+                            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                                newDevilsKiss = objAddr;
+                            }
+                        }
+
+                        // Check for Enrage/Possession
+                        if (nameIdx == enrageFounderIdx) {
+                            void* cls = *reinterpret_cast<void**>((char*)objAddr + OFF_Class);
+                            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                                newEnrageFounder = objAddr;
+                            }
+                        } else if (nameIdx == enrageBaseIdx) {
+                            void* cls = *reinterpret_cast<void**>((char*)objAddr + OFF_Class);
+                            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                                newEnrageBase = objAddr;
+                            }
+                        }
+
+                        // Check for Murder of Crows
+                        if (nameIdx == crowsFounderIdx) {
+                            void* cls = *reinterpret_cast<void**>((char*)objAddr + OFF_Class);
+                            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                                newCrowsFounder = objAddr;
+                            }
+                        } else if (nameIdx == crowsBaseIdx) {
+                            void* cls = *reinterpret_cast<void**>((char*)objAddr + OFF_Class);
+                            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                                newCrowsBase = objAddr;
+                            }
+                        }
+                    }
+                } __except (EXCEPTION_EXECUTE_HANDLER) {}
+            }
+            scan = regionEnd;
+        }
+
+        // Prefer Founder over Base (Founder is the player's actual weapon)
+        void* useBronco = newBroncoFounder ? newBroncoFounder : newBroncoBase;
+        if (useBronco) broncoWeapon = useBronco;
+        if (newDevilsKiss) devilsKissWeapon = newDevilsKiss;
+
+        void* useEnrage = newEnrageFounder ? newEnrageFounder : newEnrageBase;
+        if (useEnrage) enrageWeapon = useEnrage;
+        void* useCrows = newCrowsFounder ? newCrowsFounder : newCrowsBase;
+        if (useCrows) crowsWeapon = useCrows;
+
+        if (pass < 20 && (!broncoWeapon || !devilsKissWeapon || !enrageWeapon || !crowsWeapon)) {
+            SLog("VIGOR-COMBO: [pass %d] Waiting... Bronco=%p DK=%p Enrage=%p Crows=%p",
+                 pass, broncoWeapon, devilsKissWeapon, enrageWeapon, crowsWeapon);
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // ── COMBO 1: Hell's Rodeo (Bronco + DevilsKiss) ──────────
+        // Copy DamageType DATA from DK into Bronco. UObject header preserved
+        // → XRollingThunderDamageType vtable (lift) + DK data (fire).
+        // ══════════════════════════════════════════════════════════
+        if (broncoWeapon && devilsKissWeapon) {
+            void* dkTapDmg  = *reinterpret_cast<void**>((char*)devilsKissWeapon + OFF_TAP_DMG_TYPE);
+            void* dkHoldDmg = *reinterpret_cast<void**>((char*)devilsKissWeapon + OFF_HOLD_DMG_TYPE);
+            void* bbTapDmg  = *reinterpret_cast<void**>((char*)broncoWeapon + OFF_TAP_DMG_TYPE);
+            void* bbHoldDmg = *reinterpret_cast<void**>((char*)broncoWeapon + OFF_HOLD_DMG_TYPE);
+
+            if (dkTapDmg && !IsBadReadPtr(dkTapDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE)) {
+                int patchCount = 0;
+                __try {
+                    if (bbTapDmg && !IsBadReadPtr(bbTapDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE) &&
+                        !IsBadWritePtr(bbTapDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE)) {
+                        memcpy((char*)bbTapDmg + UOBJ_HEADER_SIZE,
+                               (char*)dkTapDmg + UOBJ_HEADER_SIZE, DMG_DATA_SIZE);
+                        patchCount++;
+                    }
+                    if (bbHoldDmg && dkHoldDmg &&
+                        !IsBadReadPtr(dkHoldDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE) &&
+                        !IsBadReadPtr(bbHoldDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE) &&
+                        !IsBadWritePtr(bbHoldDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE)) {
+                        memcpy((char*)bbHoldDmg + UOBJ_HEADER_SIZE,
+                               (char*)dkHoldDmg + UOBJ_HEADER_SIZE, DMG_DATA_SIZE);
+                        patchCount++;
+                    }
+                    // Also patch BroncoBase if different
+                    if (newBroncoBase && newBroncoBase != broncoWeapon) {
+                        void* baseTapDmg = *reinterpret_cast<void**>((char*)newBroncoBase + OFF_TAP_DMG_TYPE);
+                        if (baseTapDmg && !IsBadReadPtr(baseTapDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE) &&
+                            !IsBadWritePtr(baseTapDmg, UOBJ_HEADER_SIZE + DMG_DATA_SIZE)) {
+                            memcpy((char*)baseTapDmg + UOBJ_HEADER_SIZE,
+                                   (char*)dkTapDmg + UOBJ_HEADER_SIZE, DMG_DATA_SIZE);
+                            patchCount++;
+                        }
+                    }
+                } __except (EXCEPTION_EXECUTE_HANDLER) {
+                    SLog("VIGOR-COMBO: [pass %d] SEH in Hell's Rodeo!", pass);
+                }
+                if (patchCount > 0 && !hellsRodeoDone) {
+                    hellsRodeoDone = true;
+                    SLog("VIGOR-COMBO: [pass %d] Hell's Rodeo active! %d DamageType(s) fused. "
+                         "Bronco=%p DK=%p", pass, patchCount, broncoWeapon, devilsKissWeapon);
+                }
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // ── COMBO 2: Carrion Contract (Possession + Crows) ───────
+        // STATUS: DISABLED — projectile pointer swap causes GetOutermost() crash
+        // on shutdown (engine object ownership tracking finds foreign pointer).
+        // Also, the swap only replaced the projectile visual — the Enrage
+        // DamageType still only affects the single direct-hit target, so no
+        // crow AoE stun on surrounding enemies.
+        //
+        // NEXT APPROACH TO TRY:
+        // - Copy Crows DamageType data into Possession's DamageType (like
+        //   Hell's Rodeo). Both are XDamageType, so possession flag in data
+        //   would be overwritten — need to identify which data field controls
+        //   possession and preserve it while copying crow stun/damage fields.
+        // - Or: hook the projectile spawn function to fire BOTH projectiles.
+        // ══════════════════════════════════════════════════════════
+        if (enrageWeapon && crowsWeapon && !carrionContractDone) {
+            SLog("VIGOR-COMBO: [pass %d] Carrion Contract: found Enrage=%p Crows=%p (combo disabled pending RE)",
+                 pass, enrageWeapon, crowsWeapon);
+            carrionContractDone = true; // stop logging after first find
+        }
+    }
+    return 0;
+}
+
+// ─── Developer Console Enable ────────────────────────────────────────────
+// BioShock Infinite's shipping build has ConsoleClass=NULL in GEngine, which
+// prevents the viewport from creating a console during Init. By setting
+// GEngine+0xA0 to the XConsole UClass BEFORE XGameViewportClient.Init runs,
+// the engine creates a working developer console (accessible via ~ or Tab).
+//
+// Credit: Tempest (Discord) — discovered the GEngine+0xA0 ConsoleClass offset
+// and the pre-hook timing via ProcessEvent on XGameViewportClient.Init.
+//
+// We use a simpler polling approach: spin-wait for GEngine to be valid,
+// find XConsole UClass via GNames scan, and set ConsoleClass. Since our DLL
+// loads very early (winmm.dll proxy), this should beat the viewport init.
+
+static DWORD WINAPI ConsoleEnableThread(LPVOID) {
+    static const unsigned RVA_GEngine = 0xFAA024;
+
+    // STRATEGY: Find XConsole UClass FIRST (slow scan), THEN poll for GEngine
+    // and write ConsoleClass the INSTANT it appears. This avoids the race where
+    // XGameViewportClient.Init runs before our scan finishes.
+
+    // ── Step 1: Wait for GNames to be ready (needed for FName lookup) ──
+    void** gnamesPtr = nullptr;
+    for (int i = 0; i < 5000; i++) { // up to 5s
+        Sleep(1);
+        __try {
+            gnamesPtr = *reinterpret_cast<void***>(g_Base + RVA_GNames);
+            if (gnamesPtr && !IsBadReadPtr(gnamesPtr, 4)) break;
+            gnamesPtr = nullptr;
+        } __except (EXCEPTION_EXECUTE_HANDLER) { gnamesPtr = nullptr; }
+    }
+    if (!gnamesPtr) { SLog("CONSOLE: GNames not ready after 5s — FAILED"); return 0; }
+    SLog("CONSOLE: GNames ready. Scanning for XConsole UClass...");
+
+    // ── Step 2: Find FName indices (XConsole, Class, XCore) ──
+    int xconsoleNameIdx = -1;
+    int classNameIdx = -1;
+    int xcoreNameIdx = -1;
+
+    // Retry FName scan — names may still be loading
+    for (int attempt = 0; attempt < 10; attempt++) {
+        __try {
+            for (int i = 0; i < 200000; i++) {
+                if (IsBadReadPtr(gnamesPtr + i, 4)) continue;
+                char* entry = reinterpret_cast<char*>(gnamesPtr[i]);
+                if (!entry || IsBadReadPtr(entry, OFF_FNameEntry_Str + 32)) continue;
+                DWORD fl = *reinterpret_cast<DWORD*>(entry + OFF_FNameEntry_Flags);
+                if (fl & 1) continue;
+                const char* s = reinterpret_cast<const char*>(entry + OFF_FNameEntry_Str);
+                if (IsBadStringPtrA(s, 64)) continue;
+                if (strcmp(s, "XConsole") == 0)  xconsoleNameIdx = i;
+                else if (strcmp(s, "Class") == 0) classNameIdx = i;
+                else if (strcmp(s, "XCore") == 0) xcoreNameIdx = i;
+                if (xconsoleNameIdx >= 0 && classNameIdx >= 0 && xcoreNameIdx >= 0) break;
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        if (xconsoleNameIdx >= 0 && classNameIdx >= 0) break;
+        Sleep(200); // wait for more names to load
+    }
+
+    SLog("CONSOLE: FName indices: XConsole=%d Class=%d XCore=%d",
+         xconsoleNameIdx, classNameIdx, xcoreNameIdx);
+    if (xconsoleNameIdx < 0) {
+        SLog("CONSOLE: XConsole FName not found — console enable FAILED");
+        return 0;
+    }
+
+    // ── Step 3: Find XConsole UClass in memory (the SLOW part — do before GEngine) ──
+    void* xconsoleClass = nullptr;
+
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    MEMORY_BASIC_INFORMATION mbi;
+
+    // Retry the scan — the UClass object might not be allocated yet
+    for (int attempt = 0; attempt < 15 && !xconsoleClass; attempt++) {
+        unsigned char* addr = (unsigned char*)si.lpMinimumApplicationAddress;
+        unsigned char* addrEnd = (unsigned char*)si.lpMaximumApplicationAddress;
+        __try {
+            while (addr < addrEnd) {
+                if (VirtualQuery(addr, &mbi, sizeof(mbi)) == 0) { addr += 0x10000; continue; }
+                if (mbi.State == MEM_COMMIT &&
+                    (mbi.Protect == PAGE_READWRITE || mbi.Protect == PAGE_EXECUTE_READWRITE)) {
+                    unsigned char* base = (unsigned char*)mbi.BaseAddress;
+                    unsigned char* limit = base + mbi.RegionSize;
+                    for (unsigned char* p = base; p + 0x28 < limit; p += 4) {
+                        __try {
+                            int nameIdx = *reinterpret_cast<int*>(p + OFF_Name);
+                            if (nameIdx != xconsoleNameIdx) continue;
+                            int nameNum = *reinterpret_cast<int*>(p + OFF_Name + 4);
+                            if (nameNum != 0) continue;
+                            void* cls = *reinterpret_cast<void**>(p + OFF_Class);
+                            if (!cls || IsBadReadPtr(cls, 0x20)) continue;
+                            int clsNameIdx = *reinterpret_cast<int*>((char*)cls + OFF_Name);
+                            if (clsNameIdx != classNameIdx) continue;
+                            // Validate Outer is XCore package
+                            void* outer = *reinterpret_cast<void**>(p + 0x14);
+                            if (outer && !IsBadReadPtr(outer, 0x20) && xcoreNameIdx >= 0) {
+                                int outerNameIdx = *reinterpret_cast<int*>((char*)outer + OFF_Name);
+                                if (outerNameIdx != xcoreNameIdx) continue;
+                            }
+                            xconsoleClass = (void*)p;
+                            goto found_console;
+                        } __except (EXCEPTION_EXECUTE_HANDLER) { continue; }
+                    }
+                }
+                addr = (unsigned char*)mbi.BaseAddress + mbi.RegionSize;
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        if (!xconsoleClass) Sleep(100); // retry after short delay
+    }
+
+found_console:
+    if (!xconsoleClass) {
+        SLog("CONSOLE: XConsole UClass not found after 15 scan attempts — FAILED");
+        return 0;
+    }
+    SLog("CONSOLE: Found XConsole UClass at %p (pre-GEngine scan complete)", xconsoleClass);
+
+    // ── Step 4: NOW poll for GEngine — instant write the moment it appears ──
+    // At this point the slow work is done. We just spin-wait on the GEngine pointer.
+    for (int i = 0; i < 60000; i++) { // up to 60s at 1ms intervals
+        __try {
+            void** ppEngine = reinterpret_cast<void**>(g_Base + RVA_GEngine);
+            if (ppEngine && !IsBadReadPtr(ppEngine, 4)) {
+                void* engine = *ppEngine;
+                if (engine && !IsBadReadPtr(engine, 0x200)) {
+                    // IMMEDIATE write — no scan, no delay
+                    void** pConsoleClass = reinterpret_cast<void**>((char*)engine + 0xA0);
+                    *pConsoleClass = xconsoleClass;
+                    SLog("CONSOLE: *** ConsoleClass SET to %p at GEngine=%p+0xA0 ***",
+                         xconsoleClass, engine);
+                    SLog("CONSOLE: Press ~ (tilde) or Tab for developer console.");
+                    goto console_set;
+                }
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        Sleep(1);
+    }
+    SLog("CONSOLE: GEngine never appeared — FAILED");
+    return 0;
+
+console_set:
+    // ── Step 5: Keep alive — re-apply if cleared on level transitions ──
+    for (;;) {
+        Sleep(3000);
+        __try {
+            void** ppEngine = reinterpret_cast<void**>(g_Base + RVA_GEngine);
+            if (!ppEngine || IsBadReadPtr(ppEngine, 4)) continue;
+            void* curEngine = *ppEngine;
+            if (!curEngine || IsBadReadPtr(curEngine, 0x200)) continue;
+            void* curCC = *reinterpret_cast<void**>((char*)curEngine + 0xA0);
+            if (!curCC) {
+                *reinterpret_cast<void**>((char*)curEngine + 0xA0) = xconsoleClass;
+                SLog("CONSOLE: Re-applied ConsoleClass=%p (was cleared)", xconsoleClass);
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    }
+
+    return 0;
+}
+
+// ─── DLC Vigor Integration ──────────────────────────────────────────────
+// Phase 1: Verify engine function calling by using ServerCauseEvent to grant
+// a base-game vigor (CheatShockJockey). GEngine traversal finds PlayerController,
+// then we call the internal CauseEvent implementation directly.
+//
+// Engine traversal chain (stable offsets — verified in previous sessions):
+//   GEngine (base+0xFAA024) → XGameEngine
+//     +0x01B0 → TArray<ULocalPlayer*>.Data
+//       [0] → XLocalPlayer
+//         +0x002C → XPlayerController
+//           +0x0674 → XPlayerPawn (XHuman)
+//
+// ServerCauseEvent exec native (RVA 0x0CFD10):
+//   +0x44 → param parser (reads FName from FFrame)
+//   +0x80 → CALL base+0x0A10F0 (actual CauseEvent implementation, 117 bytes)
+//            internally calls base+0x093B80 (Kismet sequence iteration)
+//
+// Cheat FNames: CheatShockJockey, CheatDevilsKiss, CheatBuckingBronco, etc.
+// These trigger Kismet events that grant the corresponding vigor.
+
+static volatile void* g_PlayerController = nullptr;  // set by GEngine traversal
+
+static DWORD WINAPI DlcVigorThread(LPVOID) {
+    Sleep(60000); // 60s — must wait for level + pawn to fully load
+    SLog("DLC-VIGOR: Thread started. Phase 1 — ServerCauseEvent test.");
+
+    // ── Step 1: GEngine → PlayerController (with retry) ─────────────────
+    static const unsigned RVA_GEngine = 0xFAA024;
+    void* playerCtrl = nullptr;
+    void* pawn = nullptr;
+
+    for (int attempt = 0; attempt < 6; attempt++) {
+        if (attempt > 0) {
+            SLog("DLC-VIGOR: Retry %d — waiting 10s for pawn...", attempt);
+            Sleep(10000);
+        }
+
+        __try {
+            void** ppEngine = reinterpret_cast<void**>(g_Base + RVA_GEngine);
+            if (!ppEngine || IsBadReadPtr(ppEngine, 4)) {
+                SLog("DLC-VIGOR: ERROR — GEngine ptr unreadable"); continue;
+            }
+            void* engine = *ppEngine;
+            if (!engine || IsBadReadPtr(engine, 0x200)) {
+                SLog("DLC-VIGOR: ERROR — GEngine null (%p)", engine); continue;
+            }
+            if (attempt == 0) SLog("DLC-VIGOR: GEngine = %p", engine);
+
+            // TArray<ULocalPlayer*> at engine+0x1B0: {Data*, Num, Max}
+            void** lpData = *reinterpret_cast<void***>((char*)engine + 0x01B0);
+            int    lpNum  = *reinterpret_cast<int*>((char*)engine + 0x01B4);
+            if (!lpData || lpNum < 1 || IsBadReadPtr(lpData, 4)) {
+                SLog("DLC-VIGOR: ERROR — LocalPlayers empty"); continue;
+            }
+            void* lp = lpData[0];
+            if (!lp || IsBadReadPtr(lp, 0x80)) {
+                SLog("DLC-VIGOR: ERROR — LocalPlayer[0] unreadable"); continue;
+            }
+            if (attempt == 0) SLog("DLC-VIGOR: LocalPlayer[0] = %p", lp);
+
+            // PlayerController at LocalPlayer+0x002C
+            playerCtrl = *reinterpret_cast<void**>((char*)lp + 0x002C);
+            if (!playerCtrl || IsBadReadPtr(playerCtrl, 0x700)) {
+                SLog("DLC-VIGOR: PlayerController null"); playerCtrl = nullptr; continue;
+            }
+            SLog("DLC-VIGOR: PlayerController = %p (vtbl_rva=0x%X)",
+                 playerCtrl, *(DWORD*)playerCtrl - g_Base);
+            g_PlayerController = playerCtrl;
+
+            // Pawn at PlayerController+0x0674
+            pawn = *reinterpret_cast<void**>((char*)playerCtrl + 0x0674);
+            if (pawn && !IsBadReadPtr(pawn, 0x20)) {
+                int pawnNameIdx = *reinterpret_cast<int*>((char*)pawn + OFF_Name);
+                char pawnName[128];
+                ResolveFName(pawnNameIdx, pawnName, sizeof(pawnName));
+                SLog("DLC-VIGOR: Pawn = %p (FName='%s')", pawn, pawnName);
+                break; // pawn found — proceed
+            } else {
+                SLog("DLC-VIGOR: Pawn still null (attempt %d)", attempt);
+                pawn = nullptr;
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            SLog("DLC-VIGOR: EXCEPTION in GEngine traversal (0x%X)", GetExceptionCode());
+        }
+    }
+
+    if (!playerCtrl) {
+        SLog("DLC-VIGOR: FATAL — could not find PlayerController after retries"); return 0;
+    }
+    if (!pawn) {
+        SLog("DLC-VIGOR: WARNING — Pawn still null, proceeding anyway (may be in cutscene)");
+    }
+
+    // ── Step 2: Find cheat FName indices ────────────────────────────────
+    // Search BOTH ascii and wide names, and scan up to 400K entries.
+    // Also log any FName starting with "Cheat" for diagnostic purposes.
+    void** gnamesPtr = *reinterpret_cast<void***>(g_Base + RVA_GNames);
+    if (!gnamesPtr) { SLog("DLC-VIGOR: ERROR — GNames null"); return 0; }
+
+    int cheatShockIdx = -1, cheatDKIdx = -1, cheatBroncoIdx = -1;
+    int cheatPossessionIdx = -1, cheatCrowsIdx = -1, cheatChargeIdx = -1;
+    int cheatUndertowIdx = -1, cheatRTSIdx = -1;
+    int cheatCount = 0; // how many "Cheat*" FNames found total
+    int causeEventIdx = -1; // also look for "ServerCauseEvent"
+    int ceIdx = -1; // "ce" — the console command alias
+
+    __try {
+        for (int i = 0; i < 400000; i++) {
+            if (IsBadReadPtr(gnamesPtr + i, 4)) continue;
+            char* entry = reinterpret_cast<char*>(gnamesPtr[i]);
+            if (!entry || IsBadReadPtr(entry, OFF_FNameEntry_Str + 32)) continue;
+            DWORD fl = *reinterpret_cast<DWORD*>(entry + OFF_FNameEntry_Flags);
+
+            char nameBuf[128] = {0};
+            if (fl & 1) {
+                // Wide string — convert to narrow for comparison
+                const wchar_t* w = reinterpret_cast<const wchar_t*>(entry + OFF_FNameEntry_Str);
+                if (IsBadStringPtrW(w, 128)) continue;
+                WideCharToMultiByte(CP_UTF8, 0, w, -1, nameBuf, sizeof(nameBuf), nullptr, nullptr);
+            } else {
+                const char* s = reinterpret_cast<const char*>(entry + OFF_FNameEntry_Str);
+                if (IsBadStringPtrA(s, 128)) continue;
+                strncpy(nameBuf, s, sizeof(nameBuf) - 1);
+            }
+
+            // Log ANY FName starting with "Cheat" (diagnostic)
+            if (strncmp(nameBuf, "Cheat", 5) == 0) {
+                if (cheatCount < 30) // cap logging
+                    SLog("DLC-VIGOR: Found cheat FName [%d]: '%s'%s", i, nameBuf,
+                         (fl & 1) ? " (wide)" : "");
+                cheatCount++;
+            }
+
+            // Exact matches
+            if (strcmp(nameBuf, "CheatShockJockey") == 0)       cheatShockIdx = i;
+            else if (strcmp(nameBuf, "CheatDevilsKiss") == 0)   cheatDKIdx = i;
+            else if (strcmp(nameBuf, "CheatBuckingBronco") == 0) cheatBroncoIdx = i;
+            else if (strcmp(nameBuf, "CheatPossession") == 0)   cheatPossessionIdx = i;
+            else if (strcmp(nameBuf, "CheatMurderOfCrows") == 0) cheatCrowsIdx = i;
+            else if (strcmp(nameBuf, "CheatChargeAttack") == 0) cheatChargeIdx = i;
+            else if (strcmp(nameBuf, "CheatUndertow") == 0)     cheatUndertowIdx = i;
+            else if (strcmp(nameBuf, "CheatReturnToSender") == 0) cheatRTSIdx = i;
+            else if (strcmp(nameBuf, "ServerCauseEvent") == 0)  causeEventIdx = i;
+            else if (strcmp(nameBuf, "ce") == 0)                ceIdx = i;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    SLog("DLC-VIGOR: Total 'Cheat*' FNames found: %d", cheatCount);
+    SLog("DLC-VIGOR: Cheat FNames: Shock=%d DK=%d Bronco=%d Possess=%d "
+         "Crows=%d Charge=%d Undertow=%d RTS=%d",
+         cheatShockIdx, cheatDKIdx, cheatBroncoIdx, cheatPossessionIdx,
+         cheatCrowsIdx, cheatChargeIdx, cheatUndertowIdx, cheatRTSIdx);
+    SLog("DLC-VIGOR: Other FNames: ServerCauseEvent=%d ce=%d", causeEventIdx, ceIdx);
+
+    // If no cheat FNames found, the Kismet events may not be registered.
+    // Still proceed with byte dump for analysis.
+    if (cheatShockIdx < 0) {
+        SLog("DLC-VIGOR: WARNING — CheatShockJockey FName not in GNames table. "
+             "Cheat events may not be registered for this level.");
+    }
+
+    // ── Step 3: Dump execServerCauseEvent bytes for calling-convention analysis
+    // The exec wrapper at base+0x0CFD10 calls the internal function at +0x80.
+    // Dump both to the log so we can see the exact PUSH/MOV/CALL sequence.
+    {
+        unsigned char* func = reinterpret_cast<unsigned char*>(g_Base + 0x0CFD10);
+        SLog("DLC-VIGOR: === execServerCauseEvent @ %p (base+0x0CFD10), ~0xB1 bytes ===",
+             func);
+        __try {
+            for (int r = 0; r < 12; r++) {
+                char hex[80]; int p = 0;
+                for (int c = 0; c < 16; c++)
+                    p += sprintf(hex + p, "%02X ", func[r * 16 + c]);
+                SLog("DLC-VIGOR:   +%02X: %s", r * 16, hex);
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            SLog("DLC-VIGOR: EXCEPTION reading exec bytes");
+        }
+
+        // Internal CauseEvent implementation (117 bytes)
+        unsigned char* ce = reinterpret_cast<unsigned char*>(g_Base + 0x0A10F0);
+        SLog("DLC-VIGOR: === CauseEvent internal @ %p (base+0x0A10F0), ~117 bytes ===",
+             ce);
+        __try {
+            for (int r = 0; r < 8; r++) {
+                char hex[80]; int p = 0;
+                for (int c = 0; c < 16; c++)
+                    p += sprintf(hex + p, "%02X ", ce[r * 16 + c]);
+                SLog("DLC-VIGOR:   +%02X: %s", r * 16, hex);
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            SLog("DLC-VIGOR: EXCEPTION reading CauseEvent bytes");
+        }
+
+        // Decode the CALL at exec+0x80 to confirm target address
+        __try {
+            unsigned char opcode = func[0x80];
+            if (opcode == 0xE8) { // CALL rel32
+                int rel = *reinterpret_cast<int*>(func + 0x81);
+                uintptr_t target = (uintptr_t)(func + 0x85) + rel;
+                SLog("DLC-VIGOR: exec+0x80: CALL %p (rva=0x%X)",
+                     (void*)target, (unsigned)(target - g_Base));
+            } else {
+                SLog("DLC-VIGOR: exec+0x80: opcode=0x%02X (not E8/CALL!)", opcode);
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+        // Also decode what's pushed before the CALL (look at exec+0x60..0x7F)
+        // to understand the parameter setup
+        SLog("DLC-VIGOR: === Parameter setup region (exec+0x50..0x8F) ===");
+        __try {
+            for (int r = 5; r < 9; r++) {
+                char hex[80]; int p = 0;
+                for (int c = 0; c < 16; c++)
+                    p += sprintf(hex + p, "%02X ", func[r * 16 + c]);
+                SLog("DLC-VIGOR:   +%02X: %s", r * 16, hex);
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    }
+
+    // ── Step 4: Attempt CauseEvent call ─────────────────────────────────
+    // From the byte dump: exec+0x7E does `mov ecx, [FFrame+0x10]` before
+    // calling CauseEvent. So ECX is NOT the PlayerController — it's some
+    // object from the FFrame (likely Level, WorldInfo, or similar).
+    //
+    // CauseEvent at 0x0A10F0 reads [ecx+0x38] immediately (likely Children
+    // or Sequences list for a Level/Container). We try:
+    //   1. PlayerController->Outer (Level?)
+    //   2. PlayerController->Outer->Outer (Package/World?)
+    //   3. Pawn->Outer
+    // Each wrapped in SEH. Also dump the Outer chain for diagnostics.
+    //
+    // CauseEvent signature (no stack params — confirmed from ret without N):
+    //   int __thiscall CauseEvent(void* LevelOrSequenceContainer)
+    // But it clearly needs to know the FName somehow — check if there's a
+    // hidden global or if we need to look at the sub-call at +0x27.
+
+    if (cheatShockIdx < 0) {
+        SLog("DLC-VIGOR: Skipping CauseEvent call — no cheat FName available.");
+        SLog("DLC-VIGOR: Phase 1 complete (byte dump only).");
+        return 0;
+    }
+
+    // Dump PlayerController Outer chain for analysis
+    SLog("DLC-VIGOR: === PlayerController Outer chain ===");
+    void* outerChain[8] = {0};
+    int outerCount = 0;
+    __try {
+        void* cur = playerCtrl;
+        for (int i = 0; i < 8 && cur; i++) {
+            void* outer = *reinterpret_cast<void**>((char*)cur + 0x14); // UObject+0x14 = Outer
+            if (!outer || IsBadReadPtr(outer, 0x40)) break;
+            outerChain[i] = outer;
+            outerCount = i + 1;
+            int nameIdx = *reinterpret_cast<int*>((char*)outer + OFF_Name);
+            char name[128];
+            ResolveFName(nameIdx, name, sizeof(name));
+            // Also read class name
+            void* cls = *reinterpret_cast<void**>((char*)outer + OFF_Class);
+            char clsName[128] = "?";
+            if (cls && !IsBadReadPtr(cls, 0x20)) {
+                int clsNameIdx = *reinterpret_cast<int*>((char*)cls + OFF_Name);
+                ResolveFName(clsNameIdx, clsName, sizeof(clsName));
+            }
+            SLog("DLC-VIGOR:   Outer[%d] = %p FName='%s' Class='%s' +0x38=%p",
+                 i, outer, name, clsName,
+                 *reinterpret_cast<void**>((char*)outer + 0x38));
+            cur = outer;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        SLog("DLC-VIGOR: EXCEPTION walking Outer chain");
+    }
+
+    // Also dump what's at PlayerController+0x38 (what CauseEvent would read)
+    __try {
+        void* pc38 = *reinterpret_cast<void**>((char*)playerCtrl + 0x38);
+        SLog("DLC-VIGOR: PlayerController+0x38 = %p", pc38);
+        if (pawn) {
+            void* pawn38 = *reinterpret_cast<void**>((char*)pawn + 0x38);
+            SLog("DLC-VIGOR: Pawn+0x38 = %p", pawn38);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    // The internal CauseEvent takes NO FName parameter on the stack (ret without N).
+    // Re-examining: at exec+0x80, the CALL is to the function that iterates
+    // sequences. The FName was parsed earlier and stored at [esp+0x18].
+    // Since there's no push before the call, the FName must already be accessible
+    // from the caller's stack frame (which CauseEvent can access via ESP offset).
+    //
+    // THEORY: CauseEvent actually DOES read the FName from the caller's stack!
+    // After call, return addr is pushed. CauseEvent does sub esp,0x14 + push esi.
+    // So caller's [esp+0x18] (FName) is at CauseEvent's [esp+0x18+4+0x14+4] = [esp+0x34].
+    // But there's no access to [esp+0x34] in the dump...
+    //
+    // ALTERNATIVE THEORY: The exec function at +0x7E-+0x80 isn't the only path.
+    // The function at 0x0A10F0 might be a DIFFERENT helper (sequence iterator)
+    // that doesn't need the FName at all. The actual event triggering might happen
+    // AFTER the call returns (at +0x85..+0xB0 in the exec function).
+    //
+    // Let's dump exec+0x80..0xB1 to see what happens AFTER CauseEvent returns:
+    SLog("DLC-VIGOR: === exec post-CauseEvent region (+0x80..+0xBF) ===");
+    __try {
+        unsigned char* func = reinterpret_cast<unsigned char*>(g_Base + 0x0CFD10);
+        for (int r = 8; r < 12; r++) {
+            char hex[80]; int p = 0;
+            for (int c = 0; c < 16; c++)
+                p += sprintf(hex + p, "%02X ", func[r * 16 + c]);
+            SLog("DLC-VIGOR:   +%02X: %s", r * 16, hex);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    // CauseEvent direct calls DISABLED — always crash (ACCESS_VIOLATION on all
+    // Outer objects). Using developer console 'ce CheatShockJockey' instead.
+    // The console enable thread (ConsoleEnableThread) handles this now.
+    SLog("DLC-VIGOR: CauseEvent direct calls DISABLED (use console 'ce' command instead).");
+
+    SLog("DLC-VIGOR: Phase 1 complete. Review wic_spawn.log for byte dump analysis.");
+    return 0;
+}
+
+// ─── Weapon Stat Patcher (fire rate & salt cost) ─────────────────────────
+// Discovered property offsets (from live-process memory scanning):
+//   +0x0240 : float StandardFireDelay — fire interval in seconds
+//   +0x02BC : float ShotCost (tap)    — vigor salt cost per single use
+//   +0x039C : float ShotCost (held)   — vigor salt cost for charged/held use
+// Strategy: find XWeapon UClass dynamically via GNames, then scan all memory
+// for instances (class ptr at +0x20), identify by FName, and patch.
+static DWORD WINAPI WeaponStatPatchThread(LPVOID) {
+    // Target offsets within XWeapon objects
+    static const unsigned OFF_FIRE_INTERVAL   = 0x0240; // float seconds
+    static const unsigned OFF_SALT_COST_TAP   = 0x02BC; // float salt per tap
+    static const unsigned OFF_SALT_COST_HELD  = 0x039C; // float salt per hold
+    static const unsigned OFF_AMMO_COUNT      = 0x07C4; // int current ammo in clip (AmmoCount)
+    static const unsigned OFF_SPARE_AMMO       = 0x07EC; // int current reserve (SpareAmmoCount)
+    // MaxAmmoCountAttrib struct at +0x07C8 (36 bytes):
+    //   struct+0x08 = CurrentValue, struct+0x0C = BaseValue
+    static const unsigned OFF_MAX_CLIP_CUR     = 0x07D0; // float MaxAmmoAttrib.CurrentValue
+    static const unsigned OFF_MAX_CLIP_BASE    = 0x07D4; // float MaxAmmoAttrib.BaseValue
+    // MaxSpareAmmoCountAttrib struct at +0x07F0 (36 bytes):
+    static const unsigned OFF_MAX_RESERVE_CUR  = 0x07F8; // float MaxSpareAttrib.CurrentValue
+    static const unsigned OFF_MAX_RESERVE_BASE = 0x07FC; // float MaxSpareAttrib.BaseValue
+
+    // ── Per-weapon configuration ──────────────────────────────────────────
+    // Each entry defines: FName substring match, target fire rate, clip, reserve.
+    // A value of -1 means "don't change this stat".
+    struct WeaponConfig {
+        const char* nameMatch;   // FName substring to match (e.g. "Pistol")
+        float fireInterval;      // target fire interval in seconds (-1 = no change)
+        int   clipSize;          // target clip size (-1 = no change)
+        int   reserveSize;       // target reserve ammo (-1 = no change)
+    };
+
+    static const WeaponConfig weaponConfigs[] = {
+        // ── Lead Hose (Machine Gun): chaos minigun ──
+        { "MachineGun",    0.03f,   100,   900 },
+        { "Gatling",       0.03f,   100,   900 },
+
+        // ── Dead Ringer (Pistol): slow, precise, devastating ──
+        // High-skill headshot weapon. Not spammy — rewards aim.
+        { "Pistol",        0.80f,     5,   180 },
+
+        // ── Boomstick (Shotgun): close-range room clearer ──
+        // Anything in front of you gets folded.
+        { "Shotgun",       -1.0f,     8,   120 },
+
+        // ── Union Carbine: controlled mid-range workhorse ──
+        // The "serious player" gun. Not flashy, but deadly efficient.
+        { "Carbine",       0.18f,    30,   300 },
+
+        // Sentinel
+        { nullptr, 0, 0, 0 }
+    };
+
+    // Salt cost multiplier: 0.5 = half cost
+    static const float    SALT_COST_MULT       = 0.5f;
+
+    // Track addresses we've already patched to avoid re-halving salt costs
+    static const int MAX_PATCHED = 512;
+    void* patchedAddrs[MAX_PATCHED];
+    int   patchedCount = 0;
+
+    // Track addresses we've already patched for absolute weapon stats
+    static const int MAX_WPN_PATCHED = 512;
+    void* wpnPatchedAddrs[MAX_WPN_PATCHED];
+    int   wpnPatchedCount = 0;
+
+    Sleep(30000); // wait 30s for game to fully load
+    SLog("WPN-STAT: Thread started. Scanning for weapon objects...");
+
+    // ── Step 1: Find "XWeapon" FName index by scanning GNames ──
+    void** gnamesPtr = *reinterpret_cast<void***>(g_Base + RVA_GNames);
+    if (!gnamesPtr) {
+        SLog("WPN-STAT: ERROR — GNames is null!"); return 0;
+    }
+
+    int xweaponIdx = -1;
+    __try {
+        for (int i = 0; i < 200000; i++) {
+            if (IsBadReadPtr(gnamesPtr + i, 4)) continue;
+            char* entry = reinterpret_cast<char*>(gnamesPtr[i]);
+            if (!entry || IsBadReadPtr(entry, OFF_FNameEntry_Str + 16)) continue;
+            DWORD flags = *reinterpret_cast<DWORD*>(entry + OFF_FNameEntry_Flags);
+            const char* str;
+            if (flags & 1) { // wide
+                const wchar_t* w = reinterpret_cast<const wchar_t*>(entry + OFF_FNameEntry_Str);
+                if (IsBadStringPtrW(w, 32)) continue;
+                if (wcscmp(w, L"XWeapon") == 0) { xweaponIdx = i; break; }
+            } else {
+                str = reinterpret_cast<const char*>(entry + OFF_FNameEntry_Str);
+                if (IsBadStringPtrA(str, 32)) continue;
+                if (strcmp(str, "XWeapon") == 0) { xweaponIdx = i; break; }
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+
+    if (xweaponIdx < 0) {
+        SLog("WPN-STAT: ERROR — could not find 'XWeapon' in GNames!"); return 0;
+    }
+    SLog("WPN-STAT: FName 'XWeapon' = index %d", xweaponIdx);
+
+    // ── Step 2: Find XWeapon UClass by scanning for a UObject whose FName
+    //    matches "XWeapon" and whose class is the "Class" metaclass ──
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    unsigned char* scanMin = (unsigned char*)si.lpMinimumApplicationAddress;
+    unsigned char* scanMax = (unsigned char*)si.lpMaximumApplicationAddress;
+
+    void* xweaponClass = nullptr;
+    MEMORY_BASIC_INFORMATION mbi;
+    {
+        unsigned char* scan = scanMin;
+        while (scan < scanMax && !xweaponClass) {
+            if (VirtualQuery(scan, &mbi, sizeof(mbi)) == 0) break;
+            unsigned char* regionEnd = (unsigned char*)mbi.BaseAddress + mbi.RegionSize;
+            if (regionEnd <= scan) break;
+
+            if (mbi.State == MEM_COMMIT && !(mbi.Protect & PAGE_GUARD) &&
+                (mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY | PAGE_READONLY | PAGE_EXECUTE_READ))) {
+                unsigned char* base = (unsigned char*)mbi.BaseAddress;
+                SIZE_T sz = mbi.RegionSize;
+                __try {
+                    for (SIZE_T i = 0; i + 0x28 <= sz; i += 4) {
+                        int nameIdx = *reinterpret_cast<int*>(base + i + OFF_Name);
+                        if (nameIdx != xweaponIdx) continue;
+                        int nameNum = *reinterpret_cast<int*>(base + i + OFF_Name + 4);
+                        if (nameNum != 0) continue;
+                        void* cls = *reinterpret_cast<void**>(base + i + OFF_Class);
+                        if (!cls || IsBadReadPtr(cls, OFF_Name + 8)) continue;
+                        // Check if class is a "Class" metaclass (self-referencing or name is "Class")
+                        int clsNameIdx = *reinterpret_cast<int*>((char*)cls + OFF_Name);
+                        char clsNameBuf[64];
+                        ResolveFName(clsNameIdx, clsNameBuf, sizeof(clsNameBuf));
+                        if (strcmp(clsNameBuf, "Class") == 0) {
+                            xweaponClass = (void*)(base + i);
+                            break;
+                        }
+                    }
+                } __except (EXCEPTION_EXECUTE_HANDLER) {}
+            }
+            scan = regionEnd;
+        }
+    }
+
+    if (!xweaponClass) {
+        SLog("WPN-STAT: ERROR — could not find XWeapon UClass!"); return 0;
+    }
+    SLog("WPN-STAT: XWeapon UClass @ 0x%p", xweaponClass);
+
+    // ── Step 3: Two-phase scan ──
+    // Phase A: collect known weapon/vigor archetype addresses by FName
+    // Phase B: patch ALL instances whose FName OR archetype chain matches
+    static const int MAX_GUN_ARCHETYPES = 128;
+    void* gunArchetypes[MAX_GUN_ARCHETYPES];
+    int   gunArchTypes[MAX_GUN_ARCHETYPES]; // index into weaponConfigs[]
+    int   gunArchCount = 0;
+    static const int MAX_VIGOR_ARCHETYPES = 64;
+    void* vigorArchetypes[MAX_VIGOR_ARCHETYPES];
+    int   vigorArchCount = 0;
+
+    // Helper: find which weaponConfig index an archetype belongs to (-1 if none)
+    #define FIND_GUN_ARCH(p) ([&]() -> int { for(int _k=0;_k<gunArchCount;_k++) if(gunArchetypes[_k]==(p)) return gunArchTypes[_k]; return -1; }())
+    #define IS_VIGOR_ARCH(p) ([&]{ for(int _k=0;_k<vigorArchCount;_k++) if(vigorArchetypes[_k]==(p)) return true; return false; }())
+
+    int grandTotal = 0;
+    for (int pass = 0; ; pass++) {  // run forever to catch level-change respawns
+        if (pass > 0) Sleep(pass < 12 ? 10000 : 30000); // fast for 2min, then every 30s
+        int passPatches = 0;
+
+        unsigned char* scan = scanMin;
+        while (scan < scanMax) {
+            if (VirtualQuery(scan, &mbi, sizeof(mbi)) == 0) break;
+            unsigned char* regionEnd = (unsigned char*)mbi.BaseAddress + mbi.RegionSize;
+            if (regionEnd <= scan) break;
+
+            // Only check writable pages (object instances live on heap)
+            if (mbi.State == MEM_COMMIT && !(mbi.Protect & PAGE_GUARD) &&
+                (mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY))) {
+                unsigned char* rbase = (unsigned char*)mbi.BaseAddress;
+                SIZE_T sz = mbi.RegionSize;
+
+                __try {
+                    for (SIZE_T i = 0; i + 0x800 <= sz; i += 4) {
+                        // Check for UClass* == xweaponClass at +0x20
+                        void** clsSlot = reinterpret_cast<void**>(rbase + i + OFF_Class);
+                        if (*clsSlot != xweaponClass) continue;
+
+                        void* objAddr = rbase + i;
+                        int nameIdx = *reinterpret_cast<int*>((char*)objAddr + OFF_Name);
+                        int nameNum = *reinterpret_cast<int*>((char*)objAddr + OFF_Name + 4);
+                        if (nameIdx < 0 || nameIdx > 500000 || nameNum < -1 || nameNum > 100000) continue;
+
+                        char objName[128];
+                        ResolveFName(nameIdx, objName, sizeof(objName));
+                        if (!objName[0]) continue;
+
+                        // Read archetype pointer at +0x24
+                        void* archPtr = *reinterpret_cast<void**>((char*)objAddr + 0x24);
+
+                        // ── Determine weapon type by matching FName against configs ──
+                        int cfgIdx = -1;
+                        for (int ci = 0; weaponConfigs[ci].nameMatch; ci++) {
+                            if (strstr(objName, weaponConfigs[ci].nameMatch)) {
+                                cfgIdx = ci;
+                                break;
+                            }
+                        }
+                        // Also check archetype chain for inherited weapon type
+                        if (cfgIdx < 0 && archPtr) {
+                            cfgIdx = FIND_GUN_ARCH(archPtr);
+                            if (cfgIdx < 0 && !IsBadReadPtr(archPtr, 0x28)) {
+                                void* arch2 = *reinterpret_cast<void**>((char*)archPtr + 0x24);
+                                if (arch2) cfgIdx = FIND_GUN_ARCH(arch2);
+                            }
+                        }
+
+                        // Register as archetype if named directly
+                        if (cfgIdx >= 0 && strstr(objName, weaponConfigs[cfgIdx].nameMatch)) {
+                            bool found = false;
+                            for (int k = 0; k < gunArchCount; k++) if (gunArchetypes[k] == objAddr) { found = true; break; }
+                            if (!found && gunArchCount < MAX_GUN_ARCHETYPES) {
+                                gunArchetypes[gunArchCount] = objAddr;
+                                gunArchTypes[gunArchCount] = cfgIdx;
+                                gunArchCount++;
+                            }
+                        }
+
+                        // ── Apply weapon config (fire rate + ammo) ──
+                        if (cfgIdx >= 0) {
+                            // Skip AI weapons (Elizabeth, ShotgunBeta, GunnerBeta)
+                            if (strstr(objName, "XAI_")) goto skip_weapon;
+
+                            const WeaponConfig& cfg = weaponConfigs[cfgIdx];
+
+                            // Check if we already patched this weapon instance
+                            bool alreadyWpnPatched = false;
+                            for (int wi = 0; wi < wpnPatchedCount; wi++) {
+                                if (wpnPatchedAddrs[wi] == objAddr) { alreadyWpnPatched = true; break; }
+                            }
+
+                            bool didPatchWpn = false;
+
+                            // Fire interval
+                            if (cfg.fireInterval > 0.0f) {
+                                float* pFI = reinterpret_cast<float*>((char*)objAddr + OFF_FIRE_INTERVAL);
+                                float cur = *pFI;
+                                if (cur > 0.001f && cur < 10.0f && cur == cur &&
+                                    (cur < cfg.fireInterval - 0.005f || cur > cfg.fireInterval + 0.005f)) {
+                                    SLog("WPN-STAT: [pass %d] %s_%d @ 0x%p: FireInterval %.3f -> %.3f",
+                                         pass, objName, nameNum, objAddr, cur, cfg.fireInterval);
+                                    *pFI = cfg.fireInterval;
+                                    passPatches++;
+                                    didPatchWpn = true;
+                                }
+                            }
+
+                            // Clip size
+                            if (cfg.clipSize > 0 && !alreadyWpnPatched) {
+                                float clipF = (float)cfg.clipSize;
+                                // AmmoCount (current clip)
+                                int* pAmmo = reinterpret_cast<int*>((char*)objAddr + OFF_AMMO_COUNT);
+                                if (*pAmmo > 0 && *pAmmo != cfg.clipSize) {
+                                    SLog("WPN-STAT: [pass %d] %s_%d @ 0x%p: AmmoCount %d -> %d",
+                                         pass, objName, nameNum, objAddr, *pAmmo, cfg.clipSize);
+                                    *pAmmo = cfg.clipSize;
+                                    passPatches++;
+                                    didPatchWpn = true;
+                                }
+                                // MaxAmmoCountAttrib (CurrentValue + BaseValue)
+                                float* pClipCur  = reinterpret_cast<float*>((char*)objAddr + OFF_MAX_CLIP_CUR);
+                                float* pClipBase = reinterpret_cast<float*>((char*)objAddr + OFF_MAX_CLIP_BASE);
+                                if (*pClipCur > 0.5f && *pClipCur != clipF && *pClipCur == *pClipCur) {
+                                    SLog("WPN-STAT: [pass %d] %s_%d @ 0x%p: MaxClip cur=%.0f->%.0f base=%.0f->%.0f",
+                                         pass, objName, nameNum, objAddr, *pClipCur, clipF, *pClipBase, clipF);
+                                    *pClipCur  = clipF;
+                                    *pClipBase = clipF;
+                                    passPatches++;
+                                    didPatchWpn = true;
+                                }
+                            }
+
+                            // Reserve ammo
+                            if (cfg.reserveSize > 0 && !alreadyWpnPatched) {
+                                float resF = (float)cfg.reserveSize;
+                                int* pSpare = reinterpret_cast<int*>((char*)objAddr + OFF_SPARE_AMMO);
+                                if (*pSpare >= 0 && *pSpare != cfg.reserveSize) {
+                                    SLog("WPN-STAT: [pass %d] %s_%d @ 0x%p: SpareAmmo %d -> %d",
+                                         pass, objName, nameNum, objAddr, *pSpare, cfg.reserveSize);
+                                    *pSpare = cfg.reserveSize;
+                                    passPatches++;
+                                    didPatchWpn = true;
+                                }
+                                float* pResCur  = reinterpret_cast<float*>((char*)objAddr + OFF_MAX_RESERVE_CUR);
+                                float* pResBase = reinterpret_cast<float*>((char*)objAddr + OFF_MAX_RESERVE_BASE);
+                                if (*pResCur > 0.5f && *pResCur != resF && *pResCur == *pResCur) {
+                                    SLog("WPN-STAT: [pass %d] %s_%d @ 0x%p: MaxReserve cur=%.0f->%.0f base=%.0f->%.0f",
+                                         pass, objName, nameNum, objAddr, *pResCur, resF, *pResBase, resF);
+                                    *pResCur  = resF;
+                                    *pResBase = resF;
+                                    passPatches++;
+                                    didPatchWpn = true;
+                                }
+                            }
+
+                            if (didPatchWpn && wpnPatchedCount < MAX_WPN_PATCHED) {
+                                wpnPatchedAddrs[wpnPatchedCount++] = objAddr;
+                            }
+                        }
+                        skip_weapon:;
+
+                        // Determine if this is a Vigor (by name or archetype chain)
+                        bool isVigor = (strstr(objName, "Plasmid_") != nullptr);
+                        if (!isVigor && archPtr) {
+                            isVigor = IS_VIGOR_ARCH(archPtr);
+                            if (!isVigor && !IsBadReadPtr(archPtr, 0x28)) {
+                                void* arch2 = *reinterpret_cast<void**>((char*)archPtr + 0x24);
+                                if (arch2) isVigor = IS_VIGOR_ARCH(arch2);
+                            }
+                        }
+                        if (isVigor && strstr(objName, "Plasmid_")) {
+                            bool found = false;
+                            for (int k = 0; k < vigorArchCount; k++) if (vigorArchetypes[k] == objAddr) { found = true; break; }
+                            if (!found && vigorArchCount < MAX_VIGOR_ARCHETYPES) vigorArchetypes[vigorArchCount++] = objAddr;
+                        }
+
+                        // ── Vigor salt cost patch (halve) ──
+                        if (isVigor) {
+                            // Check if we already patched this object
+                            bool alreadyPatched = false;
+                            for (int pi = 0; pi < patchedCount; pi++) {
+                                if (patchedAddrs[pi] == objAddr) { alreadyPatched = true; break; }
+                            }
+                            if (!alreadyPatched) {
+                                bool didPatch = false;
+                                // Tap cost
+                                float* pCostTap = reinterpret_cast<float*>((char*)objAddr + OFF_SALT_COST_TAP);
+                                float curTap = *pCostTap;
+                                if (curTap > 1.0f && curTap < 200.0f && curTap == curTap) {
+                                    float newTap = curTap * SALT_COST_MULT;
+                                    *pCostTap = newTap;
+                                    SLog("WPN-STAT: [pass %d] %s_%d @ 0x%p: SaltCost(tap) %.1f -> %.1f",
+                                         pass, objName, nameNum, objAddr, curTap, newTap);
+                                    passPatches++;
+                                    didPatch = true;
+                                }
+                                // Held/charged cost
+                                float* pCostHeld = reinterpret_cast<float*>((char*)objAddr + OFF_SALT_COST_HELD);
+                                float curHeld = *pCostHeld;
+                                if (curHeld > 1.0f && curHeld < 400.0f && curHeld == curHeld) {
+                                    float newHeld = curHeld * SALT_COST_MULT;
+                                    *pCostHeld = newHeld;
+                                    SLog("WPN-STAT: [pass %d] %s_%d @ 0x%p: SaltCost(held) %.1f -> %.1f",
+                                         pass, objName, nameNum, objAddr, curHeld, newHeld);
+                                    passPatches++;
+                                    didPatch = true;
+                                }
+                                if (didPatch && patchedCount < MAX_PATCHED) {
+                                    patchedAddrs[patchedCount++] = objAddr;
+                                }
+                            }
+                        }
+                    }
+                } __except (EXCEPTION_EXECUTE_HANDLER) {}
+            }
+            scan = regionEnd;
+        }
+
+        grandTotal += passPatches;
+        if (passPatches > 0) {
+            SLog("WPN-STAT: pass %d — %d new patches (%d total)", pass, passPatches, grandTotal);
+        }
+    }
+    // (loop runs forever — only exits if game terminates)
+    return 0;
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────
 void InitSpawnHook()
 {
@@ -2028,24 +3272,70 @@ void InitSpawnHook()
         DECL_HOOK(CycleUp,         0x50AA20)  // XDLCCPlayerController::execCycleWeaponUp
         DECL_HOOK(CycleDown,       0x50AA60)  // XDLCCPlayerController::execCycleWeaponDown
         DECL_HOOK(DropPlayers,     0x4FA090)  // XPawn::execDropWeapon_PlayersOnly
-        // NextWeapon — OVERRIDDEN for 4-weapon cycling
-        // Strategy: pre-set BackupWeaponIndex to our target, then let Real_NextWeapon
-        // toggle naturally. This uses the game's normal equip path (proper model/animation).
+        // NextWeapon — FULLY OVERRIDDEN for 4-weapon cycling
+        // Strategy: skip Real_NextWeapon entirely (avoids double-switch which caused invisible
+        // weapons). Manually advance the FFrame bytecode, then call SetEquippedWeaponIndex once.
         static const unsigned RVA_NextWeapon = 0x5090F0;
         static fn_Exec Real_NextWeapon = nullptr;
+
+        // Weapon switch functions (from disassembly of InvMgr vtable[0xB0] at 0x533000):
+        // 1. weapon->PrepareForEquip() at 0x6A7740 — reads weapon state byte at +0x3E7
+        //    Signature: thiscall(weapon), NO stack params, plain ret. Returns state in AL.
+        // 2. InvMgr->SwitchToWeapon(weapon,prepResult,0,0) at 0x5326C0 — performs the switch
+        //    Signature: thiscall(invMgr, weapon, prepResult, p3, p4), ret 0x10 (4 stack params)
+        typedef BYTE (__thiscall *fn_PrepForEquip)(void* weapon);
+        typedef void (__thiscall *fn_SwitchToWeapon)(void* invMgr, void* weapon, int prepResult, int p3, int p4);
+        static fn_PrepForEquip PrepareForEquip = nullptr;
+        static fn_SwitchToWeapon SwitchToWeapon = nullptr;
+
         struct H_NextWeapon {
             static void __fastcall Hook(void* T, void* e, void* S, void* R) {
+                static bool bDumped = false;
+
                 if (!s_InvMgr) {
                     s_InvMgr = T;
-                    SLog("WPN: Captured InvMgr = %p", T);
+                    SLog("WPN: Captured InvMgr = %p (vtbl_rva=0x%X)", T, *(DWORD*)T - g_Base);
+                }
+                if (!PrepareForEquip) {
+                    PrepareForEquip = (fn_PrepForEquip)(g_Base + 0x6A7740);
+                    SwitchToWeapon = (fn_SwitchToWeapon)(g_Base + 0x5326C0);
+                    SLog("WPN: PrepareForEquip=%p SwitchToWeapon=%p", PrepareForEquip, SwitchToWeapon);
+                }
+
+                // ── Manually advance FFrame bytecode (replicating exec stub logic) ──
+                BYTE* frame = (BYTE*)S;
+                DWORD* codePtr = (DWORD*)(frame + 0x18);
+                (*codePtr)++;  // skip first token byte
+                if (**(BYTE**)codePtr == 0x41) {
+                    (*codePtr)++;  // skip EX_EndFunctionParms
                 }
 
                 BYTE* inv = (BYTE*)s_InvMgr;
                 DWORD* weapons = (DWORD*)(inv + 0x1FC); // Weapons[36] array
                 int currentIdx = *(int*)(inv + 0x2A0);  // EquippedWeaponIndex
-                DWORD xWeaponVtbl = g_Base + VTBL_RVA_XWEAPON; // runtime vtable address
+                DWORD xWeaponVtbl = g_Base + VTBL_RVA_XWEAPON;
 
-                // Build list of populated GUN slots (filter by XWeapon vtable, skip vigors/melee)
+                // ONE-TIME diagnostic dump: log ALL weapon slots and their vtable RVAs
+                if (!bDumped) {
+                    bDumped = true;
+                    SLog("WPN: === WEAPON ARRAY DUMP (InvMgr=%p, this=%p) ===", s_InvMgr, T);
+                    SLog("WPN: InvMgr vtbl_rva=0x%X, EquipIdx=%d, BackupIdx=%d",
+                         *(DWORD*)inv - g_Base, currentIdx, *(int*)(inv + 0x2A4));
+                    SLog("WPN: XWeapon vtbl target = 0x%X (rva=0x%X)", xWeaponVtbl, VTBL_RVA_XWEAPON);
+                    for (int i = 0; i < 36; i++) {
+                        if (weapons[i] != 0 && !IsBadReadPtr((void*)weapons[i], 4)) {
+                            DWORD vtbl = *(DWORD*)weapons[i];
+                            // UObject FName index is at +0x2C (compact name index)
+                            int nameIdx = *(int*)((BYTE*)weapons[i] + 0x2C);
+                            SLog("WPN:   [%2d] obj=%08X vtbl_rva=0x%06X nameIdx=%d %s",
+                                 i, weapons[i], vtbl - g_Base, nameIdx,
+                                 (vtbl == xWeaponVtbl) ? "<-- GUN" : "");
+                        }
+                    }
+                    SLog("WPN: === END DUMP ===");
+                }
+
+                // Build list of populated GUN slots (filter by XWeapon vtable)
                 int gunSlots[36];
                 int numGuns = 0;
                 for (int i = 0; i < 36; i++) {
@@ -2059,29 +3349,33 @@ void InitSpawnHook()
                 }
 
                 if (numGuns <= 1) {
-                    // Only 0 or 1 gun — let original behavior handle it
-                    Real_NextWeapon(T, e, S, R);
                     return;
                 }
 
-                // Find current position in our cycle list
+                // Find current weapon's position in our gun list
                 int curPos = -1;
                 for (int i = 0; i < numGuns; i++) {
                     if (gunSlots[i] == currentIdx) { curPos = i; break; }
                 }
 
-                // Advance to next slot (wrap around)
+                // Advance to next gun (wrap around)
                 int nextPos = (curPos + 1) % numGuns;
                 int nextIdx = gunSlots[nextPos];
 
-                SLog("WPN: Cycle %d -> %d (slot %d/%d)", currentIdx, nextIdx, nextPos+1, numGuns);
+                if (nextIdx == currentIdx) return;
 
-                // Pre-set BackupWeaponIndex to our desired target
-                // When Real_NextWeapon toggles equipped <-> backup, it will land on nextIdx
-                *(int*)(inv + 0x2A4) = nextIdx;
+                // Get weapon object from the slot
+                void* weaponObj = (void*)weapons[nextIdx];
+                if (!weaponObj) return;
 
-                // Let the game's normal NextWeapon handle the switch (proper model/anim/sound)
-                Real_NextWeapon(T, e, S, R);
+                SLog("WPN: Cycle %d -> %d (slot %d/%d) wpn=%p",
+                     currentIdx, nextIdx, nextPos+1, numGuns, weaponObj);
+
+                // Proper 2-step weapon switch (matches game's internal path at 0x533000):
+                // Step 1: Check weapon state (no stack params, just ecx=weapon)
+                BYTE prepResult = PrepareForEquip(weaponObj);
+                // Step 2: Perform the switch (4 stack params: weapon, prepResult, 0, 0)
+                SwitchToWeapon(s_InvMgr, weaponObj, (int)prepResult, 0, 0);
             }
         };
 
@@ -2103,7 +3397,8 @@ void InitSpawnHook()
             { RVA_CycleUp,       (void*)&H_CycleUp::Hook,       (void**)&Real_CycleUp,       "CycleWeaponUp" },
             { RVA_CycleDown,     (void*)&H_CycleDown::Hook,     (void**)&Real_CycleDown,     "CycleWeaponDown" },
             { RVA_DropPlayers,   (void*)&H_DropPlayers::Hook,   (void**)&Real_DropPlayers,   "DropWeapon_PlayersOnly" },
-            { RVA_NextWeapon,    (void*)&H_NextWeapon::Hook,    (void**)&Real_NextWeapon,    "NextWeapon" },
+            // DISABLED: weapon cycling mod shelved — signatures/behavior need more RE work
+            //{ RVA_NextWeapon,    (void*)&H_NextWeapon::Hook,    (void**)&Real_NextWeapon,    "NextWeapon" },
         };
         for (auto& h : hooks) {
             void* target = reinterpret_cast<void*>(g_Base + h.rva);
@@ -2115,6 +3410,27 @@ void InitSpawnHook()
             }
         }
     }
+
+    // ── Developer console enable (must run ASAP to beat ViewportClient.Init) ──
+    CreateThread(nullptr, 0, ConsoleEnableThread, nullptr, 0, nullptr);
+    SLog("CONSOLE: Background thread started (polling for GEngine).");
+
+    // ── Vigor name runtime patcher (background thread) ────────────────────
+    CreateThread(nullptr, 0, VigorRenamePatchThread, nullptr, 0, nullptr);
+    SLog("VIGOR-RENAME: Background patcher thread started (20s delay).");
+
+    // ── Weapon stat patcher: fire rate + salt cost (background thread) ────
+    CreateThread(nullptr, 0, WeaponStatPatchThread, nullptr, 0, nullptr);
+    SLog("WPN-STAT: Background patcher thread started (30s delay).");
+
+    // ── Vigor combination: Bronco + DevilsKiss → Hell's Rodeo (background) ──
+    CreateThread(nullptr, 0, VigorCombineThread, nullptr, 0, nullptr);
+    SLog("VIGOR-COMBO: Background combiner thread started (35s delay).");
+
+    // ── DLC Vigor Integration: Phase 1 test (ServerCauseEvent) ──
+    CreateThread(nullptr, 0, DlcVigorThread, nullptr, 0, nullptr);
+    SLog("DLC-VIGOR: Background thread started (45s delay). "
+         "Will test ServerCauseEvent with CheatShockJockey.");
 
     // ── Streaming-serialize guard (out-of-combat ~1GB memcpy crash) ──
     void* pArSerialize = reinterpret_cast<void*>(g_Base + RVA_ArSerialize);

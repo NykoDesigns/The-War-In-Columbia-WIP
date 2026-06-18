@@ -1,0 +1,19 @@
+// ============================================
+// Class: StaticMesh
+// Object: Plasmid_WinterBolt
+// Outer: Plasmid_WinterBolt
+// SerialSize: 109180
+// SerialOffset: 0x221798B
+// ============================================
+
+// === Decompiled ===
+// Reference: StaticMesh'Plasmid_WinterBolt.Plasmid_WinterBolt'
+begin object name="Plasmid_WinterBolt" class=Engine.StaticMesh
+	LightMapCoordinateIndex=1
+	LightMapResolution=32
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

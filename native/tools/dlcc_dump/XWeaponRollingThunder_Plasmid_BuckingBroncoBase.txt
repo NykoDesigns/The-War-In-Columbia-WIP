@@ -1,0 +1,85 @@
+// ============================================
+// Class: XWeaponRollingThunder
+// Object: Plasmid_BuckingBroncoBase
+// Outer: Weapons
+// SerialSize: 1461
+// SerialOffset: 0x34E8F8
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponRollingThunder'Arc_XBuckingBronco.Weapons.Plasmid_BuckingBroncoBase'
+begin object name="Plasmid_BuckingBroncoBase" class=XCore.XWeaponRollingThunder
+	// Reference: DistributionFloatConstantCurve'Arc_XBuckingBronco.Weapons.Plasmid_BuckingBroncoBase.DistributionFloatConstantCurve_216'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_216" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XBuckingBronco.Weapons.Plasmid_BuckingBroncoBase.DistributionFloatConstantCurve_218'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_218" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XBuckingBronco.Weapons.Plasmid_BuckingBroncoBase.DistributionFloatConstantCurve_217'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_217" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XBuckingBronco.Weapons.Plasmid_BuckingBroncoBase.DistributionFloatConstantCurve_219'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_219" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	WaveParams=(WaveSpeed=4000.0000000,GridEffect=XEffectGrid'Arc_RollingThunderVisualFX.RollingThunderGridFX',WaveEffect=XEffectParticle'Arc_RollingThunderVisualFX.RollingThunderWaveFX')
+	FireMode[0]=(FireModeStimulusType=EFireModeStimulusType.FMST_LinearNonInstantStimulus,DamageType=XRollingThunderDamageType'Arc_XBuckingBronco.DamageTypes.BuckingBronco_Founders_Damage',FireTimeAttrib=(BaseValue=0.5000000),EndFireTime=0.0500000,WeaponCooldownTimeAttrib=(BaseValue=0.0500000),ShotCostAttrib=(BaseValue=13.0000000),MinAmmoForAttack=1)
+	FireMode[1]=(bIsSingleShot=true)
+	WeaponDamageCategories=/* Array type was not detected. */
+	ReloadTimeAttrib=(BaseValue=2.7333300)
+	RoundsPerAmmoBunch=2
+	MaxAmmoCountAttrib=(BaseValue=8.0000000,CurrentValue=12.0000000)
+	MagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_216)
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_218)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_217)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_219)
+	AimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	ZoomedAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	FiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	WeaponSpreadDefault=(MaxSpread=0.0000000)
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'Arc_XBuckingBronco.Models_FirstPerson.Plasmid_RollingThunder_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XBuckingBronco.Models_ThirdPerson.Plasmid_RollingThunder_TPModel'
+	WeaponConsumableItemLookupID=184
+	MinDesiredPickupAmount=8
+	MaxDesiredPickupAmount=8
+	BloomingCrosshairFrameName="BuckingBronco"
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

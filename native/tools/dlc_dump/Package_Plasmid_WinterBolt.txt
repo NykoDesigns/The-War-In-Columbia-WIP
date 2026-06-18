@@ -1,0 +1,13 @@
+// ============================================
+// Class: Package
+// Object: Plasmid_WinterBolt
+// Outer: 
+// SerialSize: 12
+// SerialOffset: 0x85D2F6
+// ============================================
+
+// === Decompiled ===
+// Reference: Package'Plasmid_WinterBolt'
+begin object name="Plasmid_WinterBolt" class=Core.Package
+end object
+

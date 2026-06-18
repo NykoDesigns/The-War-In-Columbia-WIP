@@ -1,0 +1,91 @@
+// ============================================
+// Class: XWeapon
+// Object: Plasmid_VoltSwarmFounder
+// Outer: PreCoalescedItemAssets
+// SerialSize: 3798
+// SerialOffset: 0x2F29A0
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeapon'PreCoalescedItemAssets.Plasmid_VoltSwarmFounder'
+begin object name="Plasmid_VoltSwarmFounder" class=XCore.XWeapon
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_VoltSwarmFounder.DistributionFloatConstantCurve_238'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_238" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=500.0000000,OutVal=11.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=1000.0000000,OutVal=7.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=2000.0000000,OutVal=4.5000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=3000.0000000,OutVal=3.5000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=4000.0000000,OutVal=2.5000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=7000.0000000,OutVal=2.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=7001.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_VoltSwarmFounder.DistributionFloatConstantCurve_240'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_240" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_VoltSwarmFounder.DistributionFloatConstantCurve_239'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_239" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'PreCoalescedItemAssets.Plasmid_VoltSwarmFounder.DistributionFloatConstantCurve_241'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_241" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	FireMode[0]=(WeaponFireType=EWeaponFireType.EWFT_InstantHit,StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,FireModeStimulusType=EFireModeStimulusType.FMST_LinearInstantStimulus,DamageType=XDamageType'Arc_XVoltSwarm.DamageTypes.VoltSwarmFounder_BoltDamage',bUsesThreePartFire=true,bChanneledFire=true,bIsSingleShot=true,StandardFireDelay=0.0750000,BeginFireTime=1.2500000,FireTimeAttrib=(BaseValue=2.0000000),EndFireTime=0.5000000,WeaponCooldownTimeAttrib=(BaseValue=1.0000000),ShotCostAttrib=(BaseValue=16.0000000),MinAmmoForAttack=16)
+	FireMode[1]=(WeaponFireType=EWeaponFireType.EWFT_Projectile,StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,FireModeStimulusType=EFireModeStimulusType.FMST_GrenadeStimulus,DamageType=XDamageType'Arc_XVoltSwarm.DamageTypes.VoltSwarmFounder_TrapDamage',bUsesThreePartFire=true,bChanneledFire=true,bIsSingleShot=true,BeginFireTime=1.2500000,FireTimeAttrib=(BaseValue=2.0000000),EndFireTime=0.5000000,WeaponCooldownTimeAttrib=(BaseValue=0.5000000),ShotCostAttrib=(BaseValue=32.0000000),MinAmmoForAttack=32,ProjectileArchetype=XVoltSwarmProjectileBall'Arc_XVoltSwarm.Projectiles.Plasmid_VoltSwarmProjectileBall')
+	WeaponDamageCategories=/* Array type was not detected. */
+	RoundsPerAmmoBunch=16
+	MaxAmmoCountAttrib=(BaseValue=100.0000000,CurrentValue=30.0000000)
+	FireOffset=(X=160.0000000,Y=-50.0000000,Z=-4.0000000)
+	MaximumMuzzleDisplacementSize=80000.0000000
+	MagicBulletBendAngleVsDistance=/* ERROR: System.ArgumentOutOfRangeException */
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_240)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_239)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_241)
+	WeaponSpreadDefault=(MaxSpread=0.0000000)
+	WeaponSpreadZoomed=(MaxSpread=0.0000000)
+	WeaponSpreadPostSprint=(MaxSpread=0.0000000)
+	ShockedSpreadIncrease=0.0000000
+	WeaponRecoilDefault=(XBaseImpulsePerShot=(Value1=0.0000000,Value2=0.0000000),YBaseImpulsePerShot=(Value2=0.0000000),PerShotMultiplierIncrease=0.0000000,MaximumPerShotMultiplier=1.0000000,XRecoilTotalImpulseCap=(Value1=0.0000000,Value2=0.0000000),YRecoilTotalImpulseCap=(Value2=0.0000000))
+	WeaponRecoilZoomed=(XBaseImpulsePerShot=(Value1=0.0000000,Value2=0.0000000),YBaseImpulsePerShot=(Value2=0.0000000),XRecoilTotalImpulseCap=(Value1=0.0000000,Value2=0.0000000),YRecoilTotalImpulseCap=(Value2=0.0000000))
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'Arc_XVoltSwarm.Models_FirstPerson.Plasmid_VoltSwarmFounder_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XVoltSwarm.Models_ThirdPerson.Plasmid_Voltswarm_TPModel'
+	WeaponUnlockItemLookupID=15
+	WeaponConsumableItemLookupID=544
+	MinDesiredPickupAmount=32
+	MaxDesiredPickupAmount=32
+	BloomingCrosshairFrameName="SpiderTrap"
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'VigorIcons.Atlas_Vigor_Icons',Left=512,Width=64,Height=64)
+	AtlassedLargeIcon=(AtlasTexture=Texture2D'VigorIcons_128.Atlas_VigorIcons128',Left=640,Width=128,Height=128)
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

@@ -1,0 +1,76 @@
+// ============================================
+// Class: XWeaponChameleon
+// Object: Plasmid_Chameleon
+// Outer: DLCB_Arc_Chameleon
+// SerialSize: 1684
+// SerialOffset: 0x39DF13E
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponChameleon'DLCB_Arc_Chameleon.Plasmid_Chameleon'
+begin object name="Plasmid_Chameleon" class=XCore.XWeaponChameleon
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_Chameleon.Plasmid_Chameleon.DefaultEnergyBurnRateVsSpeed'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponChameleon.DefaultEnergyBurnRateVsSpeed'
+	begin object name="DefaultEnergyBurnRateVsSpeed"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=1.0000000,OutVal=3.3333330,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_Chameleon.Plasmid_Chameleon.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponChameleon.DefMagicBulletBendAngleVsDistance'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_Chameleon.Plasmid_Chameleon.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponChameleon.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_Chameleon.Plasmid_Chameleon.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponChameleon.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_Chameleon.Plasmid_Chameleon.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponChameleon.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	SoundTypeCosts=/* Array type was not detected. */
+	ChameleonModEffect=(ModEffect=XEffectDynamicGameplayAttributeMod'Arc_XGameplayAttributeEffects.FadeToBlackEffect')
+	EnergyBurnRateVsSpeed=/* ERROR: System.ArgumentException */
+	FireMode=(StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,BeginFireTime=0.5000000,FireTimeAttrib=(BaseValue=1.5000000),ShotCostAttrib=(BaseValue=5.0000000),MinAmmoForAttack=5)
+	RoundsPerAmmoBunch=5
+	MagicBulletBendAngleVsDistance=(Distribution=Distribution=DefMagicBulletBendAngleVsDistance)
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefZoomedMagicBulletBendAngleVsDistance)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarMagicBulletBendAngleVsDistance)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarZoomedMagicBulletBendAngleVsDistance)
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'DLCB_Arc_Chameleon.Models_FirstPerson.Plasmid_Chameleon_FPModel'
+	WeaponUnlockItemLookupID=1019
+	WeaponConsumableItemLookupID=1018
+	MinDesiredPickupAmount=25
+	MaxDesiredPickupAmount=25
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'VigorIcons.Atlas_Vigor_Icons',Left=256,Width=64,Height=64)
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

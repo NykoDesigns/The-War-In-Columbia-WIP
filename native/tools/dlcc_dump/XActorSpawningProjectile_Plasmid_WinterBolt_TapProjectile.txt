@@ -1,0 +1,111 @@
+// ============================================
+// Class: XActorSpawningProjectile
+// Object: Plasmid_WinterBolt_TapProjectile
+// Outer: Models_FirstPerson
+// SerialSize: 876
+// SerialOffset: 0x36F0071
+// ============================================
+
+// === Decompiled ===
+// Reference: XActorSpawningProjectile'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile'
+begin object name="Plasmid_WinterBolt_TapProjectile" class=XCore.XActorSpawningProjectile
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.ThrustVelocityCurve'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XActorSpawningProjectile.ThrustVelocityCurve'
+	begin object name="ThrustVelocityCurve"
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=6000.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear),(InVal=1000.0000000,OutVal=6000.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.HomingDegreesPerSecondCurve'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XActorSpawningProjectile.HomingDegreesPerSecondCurve'
+	begin object name="HomingDegreesPerSecondCurve"
+	end object
+	ActorArchetypeToSpawn=XBuoyantInterpActor'DLCB_Arc_XWinterBolt.FloatingIcePatch'
+	PhysicalMaterialsAllowingSpawn=/* Array type was not detected. */
+	ThrustVelocity=/* ERROR: System.ArgumentOutOfRangeException */
+	HomingDegreesPerSecond=(Distribution=Distribution=HomingDegreesPerSecondCurve)
+	// Reference: XAKAudioRTPCID'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.DangerZoneDistanceRTPCID'
+	// Archetype: XAKAudioRTPCID'XCore.Default__XHomingProjectile.DangerZoneDistanceRTPCID'
+	begin object name="DangerZoneDistanceRTPCID"
+	end object
+	DangerZoneDistanceRTPC=DangerZoneDistanceRTPCID
+	FlyingEffect=(VisualEffect=XEffectMultiple'Arc_WinterBoltVFX.WinterBolt_Tap_Projectile_FX')
+	ExplodedEffect=(VisualEffect=XEffectMultiple'Arc_WinterBoltVFX.WinterBoltExplode_FX',AudioEffect=XEffectSound'DLCB_Arc_WinterBolt_SFX.ImpactEffect')
+	// Reference: XAKAudioRTPCID'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.RTPCID'
+	// Archetype: XAKAudioRTPCID'XCore.Default__XHomingProjectile.RTPCID'
+	begin object name="RTPCID"
+	end object
+	ProjectileSpeedRTPC=RTPCID
+	// Reference: XAKAudioSwitchStateID'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.SizeSwitchStateID'
+	// Archetype: XAKAudioSwitchStateID'XCore.Default__XHomingProjectile.SizeSwitchStateID'
+	begin object name="SizeSwitchStateID"
+		AudioObject=""
+	end object
+	SizeSwitchState=SizeSwitchStateID
+	// Reference: StaticMeshComponent'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.StaticMeshComponent0'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: StaticMeshComponent'XCore.Default__XActorSpawningProjectile.StaticMeshComponent0'
+	begin object name="StaticMeshComponent0"
+	end object
+	StaticMeshComponent=StaticMeshComponent0
+	CollisionDampingXY=0.0000000
+	CollisionDampingZ=0.0000000
+	bExplodeOnImpact=true
+	bExplodeOnGroundImpact=true
+	bExplodeOnTakingDamage=false
+	DamageOnImpact=XDLCBDamageType'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapDamage'
+	ArmingTime=0.0000000
+	// Reference: XAKAudioDopplerComponent'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.DopplerComp'
+	// Archetype: XAKAudioDopplerComponent'XCore.Default__XActorSpawningProjectile.DopplerComp'
+	begin object name="DopplerComp"
+		// Reference: XAKAudioRTPCID'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.DopplerComp.RTPCID0'
+		// Archetype: XAKAudioRTPCID'XCore.Default__XActorSpawningProjectile.DopplerComp.RTPCID0'
+		begin object name="RTPCID0"
+		end object
+		DistanceToListenerRTPC=RTPCID0
+		// Reference: XAKAudioRTPCID'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.DopplerComp.RTPCID1_1'
+		// Archetype: XAKAudioRTPCID'XCore.Default__XActorSpawningProjectile.DopplerComp.RTPCID1'
+		begin object name="RTPCID1_1"
+		end object
+		SpeedToListenerRTPC=RTPCID1_1
+	end object
+	DopplerComponent=DopplerComp
+	Speed=6000.0000000
+	MaxSpeed=6000.0000000
+	// Reference: CylinderComponent'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile.CollisionCylinder'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: CylinderComponent'XCore.Default__XActorSpawningProjectile.CollisionCylinder'
+	begin object name="CollisionCylinder"
+	end object
+	CylinderComponent=CollisionCylinder
+	CollisionComponent=CollisionCylinder
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

@@ -1,0 +1,107 @@
+// ============================================
+// Class: XWeaponUndertow
+// Object: Plasmid_UndertowBase
+// Outer: Weapons
+// SerialSize: 2080
+// SerialOffset: 0x2F1290
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponUndertow'Arc_XUndertow.Weapons.Plasmid_UndertowBase'
+begin object name="Plasmid_UndertowBase" class=XCore.XWeaponUndertow
+	// Reference: DistributionFloatConstantCurve'Arc_XUndertow.Weapons.Plasmid_UndertowBase.DefaultTargetDistanceToMaxAngleDeviation'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponUndertow.DefaultTargetDistanceToMaxAngleDeviation'
+	begin object name="DefaultTargetDistanceToMaxAngleDeviation"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XUndertow.Weapons.Plasmid_UndertowBase.DefaultTargetDistanceToPullSpeed'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponUndertow.DefaultTargetDistanceToPullSpeed'
+	begin object name="DefaultTargetDistanceToPullSpeed"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XUndertow.Weapons.Plasmid_UndertowBase.DefaultTargetDragDistanceToHeightToInitiallyRaiseTargets'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponUndertow.DefaultTargetDragDistanceToHeightToInitiallyRaiseTargets'
+	begin object name="DefaultTargetDragDistanceToHeightToInitiallyRaiseTargets"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XUndertow.Weapons.Plasmid_UndertowBase.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponUndertow.DefMagicBulletBendAngleVsDistance'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XUndertow.Weapons.Plasmid_UndertowBase.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponUndertow.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XUndertow.Weapons.Plasmid_UndertowBase.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponUndertow.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XUndertow.Weapons.Plasmid_UndertowBase.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponUndertow.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	TargetDistanceToMaxAngleDeviation=(Distribution=Distribution=DefaultTargetDistanceToMaxAngleDeviation)
+	TargetMaxDistanceToSelectAttrib=(BaseValue=5000.0000000)
+	IdealDegreesBetweenTargets=20.0000000
+	TargetDistanceToPullSpeed=/* ERROR: System.ArgumentOutOfRangeException */
+	TargetDragDistanceToHeightToInitiallyRaiseTargets=(Distribution=Distribution=DefaultTargetDragDistanceToHeightToInitiallyRaiseTargets)
+	SelectedTargetPullStateEffect=(VisualEffect=XEffectMultiple'Arc_UndertowVisualFX.Undertow_WaterTentical_Grab',AudioEffect=XEffectSound'Arc_Undertow_SFX.FireEffect')
+	PlayerPullStateEffect=(VisualEffect=XEffectMultiple'Arc_UndertowVisualFX.Undertow_Player_WaterTentical_Grab')
+	SelectedTargetMultiPullStateEffect=(VisualEffect=XEffectMultiple'Arc_UndertowVisualFX.Undertow_WaterTentical_Grab')
+	PlayerMultiPullStateEffect=(VisualEffect=XEffectMultiple'Arc_UndertowVisualFX.Undertow_Player_WaterTentical_Grab')
+	PlayerPullStateEffectTargetPositionParameter="Player_OffsetLocation"
+	PlayerPullStateEffectTargetPositionSocket="GenericHumanSpine3"
+	FireMode[0]=(DamageType=XDamageType'Arc_XUndertow.DamageTypes.Undertow_Slap_Damage',FireTimeAttrib=(BaseValue=2.5000000),EndFireTime=0.5000000,ShotCostAttrib=(BaseValue=17.0000000))
+	FireMode[1]=(DamageType=XDamageType'Arc_XUndertow.DamageTypes.Undertow_Damage')
+	MaxAmmoCountAttrib=(BaseValue=6.0000000)
+	MagicBulletBendAngleVsDistance=(Distribution=Distribution=DefMagicBulletBendAngleVsDistance)
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefZoomedMagicBulletBendAngleVsDistance)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarMagicBulletBendAngleVsDistance)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarZoomedMagicBulletBendAngleVsDistance)
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'Arc_XUndertow.Models_FirstPerson.Plasmid_Undertow_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XUndertow.Models_ThirdPerson.Plasmid_Undertow_TPModel'
+	WeaponConsumableItemLookupID=5
+	MinDesiredPickupAmount=6
+	MaxDesiredPickupAmount=6
+	BloomingCrosshairFrameName="RiftTethers"
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'VigorIcons.Atlas_Vigor_Icons',Left=576,Width=64,Height=64)
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

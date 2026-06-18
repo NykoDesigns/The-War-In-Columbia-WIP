@@ -1,0 +1,73 @@
+// ============================================
+// Class: XWeaponWinterbolt
+// Object: Plasmid_WinterBolt
+// Outer: DLCB_Arc_XWinterBolt
+// SerialSize: 1899
+// SerialOffset: 0x3A47135
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponWinterbolt'DLCB_Arc_XWinterBolt.Plasmid_WinterBolt'
+begin object name="Plasmid_WinterBolt" class=XCore.XWeaponWinterbolt
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_XWinterBolt.Plasmid_WinterBolt.DefMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponWinterbolt.DefMagicBulletBendAngleVsDistance'
+	begin object name="DefMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_XWinterBolt.Plasmid_WinterBolt.DefZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponWinterbolt.DefZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefZoomedMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_XWinterBolt.Plasmid_WinterBolt.DefTBarMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponWinterbolt.DefTBarMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarMagicBulletBendAngleVsDistance"
+	end object
+	// Reference: DistributionFloatConstantCurve'DLCB_Arc_XWinterBolt.Plasmid_WinterBolt.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	// Archetype: DistributionFloatConstantCurve'XCore.Default__XWeaponWinterbolt.DefTBarZoomedMagicBulletBendAngleVsDistance'
+	begin object name="DefTBarZoomedMagicBulletBendAngleVsDistance"
+	end object
+	FireMode[0]=(WeaponFireType=EWeaponFireType.EWFT_Projectile,StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,DamageType=XDLCBDamageType'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapDamage',bUsesThreePartFire=true,bChanneledFire=true,bIsSingleShot=true,BeginFireTime=1.0000000,FireTimeAttrib=(BaseValue=2.0000000),EndFireTime=0.6666600,WeaponCooldownTimeAttrib=(BaseValue=1.0000000),ShotCostAttrib=(BaseValue=33.0000000),MinAmmoForAttack=33,ProjectileArchetype=XActorSpawningProjectile'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TapProjectile')
+	FireMode[1]=(WeaponFireType=EWeaponFireType.EWFT_Projectile,StandardFireTime=EWeaponStandardFireTiming.EWSFT_EndFire,WeaponCooldownTiming=EWeaponCooldownTiming.EWCT_EndFire,DamageType=XDamageType'DLCB_Arc_XWinterBolt.DamageTypes.WinterBolt_HoldGrenade_Damage',bUsesThreePartFire=true,bChanneledFire=true,bIsSingleShot=true,BeginFireTime=0.1000000,EndFireTime=0.6000000,ShotCostAttrib=(BaseValue=66.0000000),MinAmmoForAttack=66,PreloadFireTime=0.0100000,ProjectileArchetype=XProximityGrenadeProjectile'DLCB_Arc_XWinterBolt.Projectiles.WinterBolt_HoldGrenade_Projectile')
+	HomingProjectilesShouldOnlyUseValidAimAssistTargets=true
+	WeaponDamageCategories=/* Array type was not detected. */
+	MagicBulletBendAngleVsDistance=(Distribution=Distribution=DefMagicBulletBendAngleVsDistance)
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefZoomedMagicBulletBendAngleVsDistance)
+	TBarMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarMagicBulletBendAngleVsDistance)
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DefTBarZoomedMagicBulletBendAngleVsDistance)
+	ShockedSpreadIncrease=0.0000000
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'DLCB_Arc_XWinterBolt.Models_FirstPerson.Plasmid_WinterBolt_TPModel'
+	WeaponUnlockItemLookupID=965
+	WeaponConsumableItemLookupID=933
+	MinDesiredPickupAmount=20
+	MaxDesiredPickupAmount=20
+	AtlassedSmallIcon=(AtlasTexture=Texture2D'DLCB_Icons_64.Atlas_DLCB_Icons_64',Left=64,Width=64,Height=64)
+	AtlassedLargeIcon=(AtlasTexture=Texture2D'DLCB_Icons_128.Atlas_DLCB_Icons_128',Width=128,Height=128)
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+

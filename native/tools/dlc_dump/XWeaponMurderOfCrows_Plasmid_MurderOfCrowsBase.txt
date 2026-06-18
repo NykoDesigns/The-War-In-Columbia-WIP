@@ -1,0 +1,85 @@
+// ============================================
+// Class: XWeaponMurderOfCrows
+// Object: Plasmid_MurderOfCrowsBase
+// Outer: Weapons
+// SerialSize: 1364
+// SerialOffset: 0x307908
+// ============================================
+
+// === Decompiled ===
+// Reference: XWeaponMurderOfCrows'Arc_XMurderOfCrows.Weapons.Plasmid_MurderOfCrowsBase'
+begin object name="Plasmid_MurderOfCrowsBase" class=XCore.XWeaponMurderOfCrows
+	// Reference: DistributionFloatConstantCurve'Arc_XMurderOfCrows.Weapons.Plasmid_MurderOfCrowsBase.DistributionFloatConstantCurve_56'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_56" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=5.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XMurderOfCrows.Weapons.Plasmid_MurderOfCrowsBase.DistributionFloatConstantCurve_58'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_58" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XMurderOfCrows.Weapons.Plasmid_MurderOfCrowsBase.DistributionFloatConstantCurve_57'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_57" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=10.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	// Reference: DistributionFloatConstantCurve'Arc_XMurderOfCrows.Weapons.Plasmid_MurderOfCrowsBase.DistributionFloatConstantCurve_59'
+	// TemplateOwnerClass: none
+	// TemplateOwnerName: ''
+	begin object name="DistributionFloatConstantCurve_59" class=Engine.DistributionFloatConstantCurve
+		ConstantCurve=(Points=((InVal=0.0000000,OutVal=0.0000000,ArriveTangent=0.0000000,LeaveTangent=0.0000000,InterpMode=EInterpCurveMode.CIM_Linear)))
+	end object
+	MaxRange=6000.0000000
+	InstanceDataArchetype=XMurderOfCrowsInstanceData'Arc_XMurderOfCrows.Utility.MurderOfCrowsInstanceData'
+	BurningCrowsDamage=XDamageType'Arc_XMurderOfCrows.DamageTypes.MurderOfCrows_BurningCrowsDamage'
+	ElectricCrowsDamage=XDamageType'Arc_XMurderOfCrows.DamageTypes.MurderOfCrows_ElectricCrowsDamage'
+	FireMode[0]=(FireModeStimulusType=EFireModeStimulusType.FMST_GrenadeStimulus,DamageType=XDamageType'Arc_XMurderOfCrows.DamageTypes.MurderOfCrows_Damage',FireTimeAttrib=(BaseValue=1.0000000),EndFireTime=0.3333330,WeaponCooldownTimeAttrib=(BaseValue=8.0000000),ProjectileArchetype=XMurderOfCrowsProjectile'Arc_XMurderOfCrows.Projectiles.Plasmid_MurderOfCrows_ProxProjectile')
+	FireMode[1]=(DamageType=XDamageType'Arc_XMurderOfCrows.DamageTypes.MurderOfCrows_ProxyDamage',EndFireTime=0.3333330,ProjectileArchetype=XMurderOfCrowsProjectile'Arc_XMurderOfCrows.Projectiles.Plasmid_MurderOfCrows_ProxProjectile')
+	WeaponDamageCategories=/* Array type was not detected. */
+	MaxAmmoCountAttrib=(BaseValue=3.0000000,CurrentValue=4.0000000)
+	MagicBulletBendAngleVsDistance=/* ERROR: System.ArgumentOutOfRangeException */
+	ZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_58)
+	TBarMagicBulletBendAngleVsDistance=/* ERROR: System.ArgumentOutOfRangeException */
+	TBarZoomedMagicBulletBendAngleVsDistance=(Distribution=Distribution=DistributionFloatConstantCurve_59)
+	AimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	ZoomedAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	FiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	TBarFiringAimAssistParams=XAimAssistParameters'Arc_XAimAssist.X_AimAssistParameters_Plasmid_Default'
+	FirstPersonModelDefinitionArchetype=XWeaponModelFirstPerson'Arc_XMurderOfCrows.Models_FirstPerson.Plasmid_MurderOfCrows_FPModel'
+	ThirdPersonModelDefinitionArchetype=XWeaponModelThirdPerson'Arc_XMurderOfCrows.Models_ThirdPerson.Plasmid_MurderOfCrows_TPModel'
+	WeaponConsumableItemLookupID=257
+	MinDesiredPickupAmount=3
+	MaxDesiredPickupAmount=3
+	BloomingCrosshairFrameName="MurderOfCrows"
+end object
+
+// === Properties ===
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+  UELib.Core.UDefaultProperty
+
